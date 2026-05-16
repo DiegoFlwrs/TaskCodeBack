@@ -57,7 +57,7 @@ public class AuthController {
         ));
     }
 
-    // 🔥 NUEVO: Verificar código y registrar usuario independiente
+    // Verificar código y registrar usuario independiente
     @PostMapping("/verify-and-register")
     public ResponseEntity<AuthResponseDto> verifyAndRegisterIndependent(@Valid @RequestBody VerifyCodeAndRegisterRequestDto request) {
         log.info("Verificación y registro independiente para: {}", request.getEmail());
