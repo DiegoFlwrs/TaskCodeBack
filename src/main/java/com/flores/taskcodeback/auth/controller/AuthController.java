@@ -21,6 +21,21 @@ public class AuthController {
     private final AuthService authService;
     private final EmailVerificationService emailVerificationService;
 
+    @PostMapping("/forgot-password/send-code")
+    public ResponseEntity<Map<String, String>> sendPasswordResetCode(@Valid @RequestBody ForgotPasswordRequestDto request) {
+        authService.sendPasswordResetCode(request);
+        // Mensaje neutro para no revelar si el email existe o no.
+        return ResponseEntity.ok(Map.of(
+                "message", "Si el correo existe, se envio un codigo de recuperacion"
+        ));
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<Map<String, String>> resetPasswordWithCode(@Valid @RequestBody ResetPasswordWithCodeRequestDto request) {
+        authService.resetPasswordWithCode(request);
+        return ResponseEntity.ok(Map.of("message", "Contrasena actualizada correctamente"));
+    }
+
     // 🔥 NUEVO: Enviar código de verificación
     @PostMapping("/send-verification-code")
     public ResponseEntity<Map<String, String>> sendVerificationCode(@Valid @RequestBody SendVerificationCodeRequestDto request) {

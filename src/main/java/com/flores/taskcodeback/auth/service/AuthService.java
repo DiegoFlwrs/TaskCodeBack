@@ -5,6 +5,10 @@ import com.flores.taskcodeback.user.entity.User;
 
 public interface AuthService {
 
+    void sendPasswordResetCode(ForgotPasswordRequestDto request);
+
+    void resetPasswordWithCode(ResetPasswordWithCodeRequestDto request);
+
     AuthResponseDto registerIndependent(RegisterRequestDto request);
 
     AuthResponseDto registerTeamLeader(RegisterTeamLeaderRequestDto request);

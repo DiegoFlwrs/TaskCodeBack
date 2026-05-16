@@ -10,14 +10,18 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
-import java.util.Random;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
 public class EmailVerificationService {
+
+    private static final String CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    private static final int CODE_LENGTH = 6;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final EmailVerificationCodeRepository verificationCodeRepository;
     private final EmailService emailService;
@@ -52,8 +56,10 @@ public class EmailVerificationService {
     public boolean verifyCode(String email, String codigo) {
         log.info("Verificando código para email: {}", email);
 
+        String normalizedCode = codigo == null ? null : codigo.trim().toUpperCase();
+
         var verificationCode = verificationCodeRepository
-                .findByEmailAndCodigoAndUsedFalse(email, codigo)
+                .findByEmailAndCodigoAndUsedFalse(email, normalizedCode)
                 .orElse(null);
 
         if (verificationCode == null) {
@@ -75,8 +81,12 @@ public class EmailVerificationService {
     }
 
     private String generateVerificationCode() {
-        Random random = new Random();
-        return String.format("%06d", random.nextInt(1000000));
+        StringBuilder code = new StringBuilder(CODE_LENGTH);
+        for (int i = 0; i < CODE_LENGTH; i++) {
+            int index = SECURE_RANDOM.nextInt(CODE_CHARSET.length());
+            code.append(CODE_CHARSET.charAt(index));
+        }
+        return code.toString();
     }
 
     @Transactional

@@ -2,6 +2,7 @@ package com.flores.taskcodeback.auth.service.impl;
 
 import com.flores.taskcodeback.auth.dto.*;
 import com.flores.taskcodeback.auth.service.AuthService;
+import com.flores.taskcodeback.auth.service.EmailVerificationService;
 import com.flores.taskcodeback.config.JwtConfig;
 import com.flores.taskcodeback.equipo.entity.Equipo;
 import com.flores.taskcodeback.equipo.repository.EquipoRepository;
@@ -36,6 +37,43 @@ public class AuthServiceImpl implements AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
     private final JwtConfig jwtConfig;
+    private final EmailVerificationService emailVerificationService;
+
+    @Override
+    public void sendPasswordResetCode(ForgotPasswordRequestDto request) {
+        log.info("Solicitud de recuperacion de contrasena para: {}", request.getEmail());
+
+        userRepository.findByEmail(request.getEmail())
+                .ifPresentOrElse(
+                        user -> emailVerificationService.sendVerificationCode(user.getEmail(), user.getNombre()),
+                        () -> log.warn("Se solicito recuperacion para un email no registrado: {}", request.getEmail())
+                );
+    }
+
+    @Override
+    public void resetPasswordWithCode(ResetPasswordWithCodeRequestDto request) {
+        log.info("Intentando restablecer contrasena para: {}", request.getEmail());
+
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("La confirmacion de contrasena no coincide");
+        }
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BadRequestException("No existe una cuenta asociada a este email"));
+
+        if (!emailVerificationService.verifyCode(request.getEmail(), request.getVerificationCode())) {
+            throw new BadRequestException("Codigo de verificacion invalido o expirado");
+        }
+
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new BadRequestException("La nueva contrasena no puede ser igual a la actual");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        log.info("Contrasena restablecida correctamente para: {}", request.getEmail());
+    }
 
     @Override
     public AuthResponseDto registerIndependent(RegisterRequestDto request) {
