@@ -78,7 +78,7 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // 🔥 NUEVO: Verificar código y registrar team leader
+    // Verificar código y registrar team leader
     @PostMapping("/verify-and-register-team-leader")
     public ResponseEntity<AuthResponseDto> verifyAndRegisterTeamLeader(@Valid @RequestBody VerifyCodeAndRegisterTeamLeaderRequestDto request) {
         log.info("Verificación y registro team leader para: {}", request.getEmail());
