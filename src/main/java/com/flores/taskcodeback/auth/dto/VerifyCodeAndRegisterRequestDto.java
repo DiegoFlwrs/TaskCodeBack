@@ -28,6 +28,6 @@ public class VerifyCodeAndRegisterRequestDto {
     private String password;
 
     @NotBlank(message = "El código de verificación es obligatorio")
-    @Pattern(regexp = "^[0-9]{6}$", message = "El código debe tener 6 dígitos")
+    @Pattern(regexp = "^[A-Za-z0-9]{6}$", message = "El código debe tener 6 caracteres alfanuméricos")
     private String verificationCode;
 }

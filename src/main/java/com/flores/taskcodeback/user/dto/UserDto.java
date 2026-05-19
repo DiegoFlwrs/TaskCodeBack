@@ -1,7 +1,7 @@
 package com.flores.taskcodeback.user.dto;
 
 
-import com.flores.taskcodeback.equipo.dto.EquipoBasicDto;
+import com.flores.taskcodeback.workspace.dto.EquipoBasicDto;
 import com.flores.taskcodeback.user.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

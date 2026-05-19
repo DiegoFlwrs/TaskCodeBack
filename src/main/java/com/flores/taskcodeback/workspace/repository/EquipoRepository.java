@@ -1,6 +1,6 @@
-package com.flores.taskcodeback.equipo.repository;
+package com.flores.taskcodeback.workspace.repository;
 
-import com.flores.taskcodeback.equipo.entity.Equipo;
+import com.flores.taskcodeback.workspace.entity.Equipo;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

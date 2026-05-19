@@ -1,4 +1,4 @@
-package com.flores.taskcodeback.equipo.dto;
+package com.flores.taskcodeback.user.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,10 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EquipoBasicDto {
-
+public class UserBasicDto {
     private Long id;
     private String nombre;
-    private String descripcion;
-    private String codigo;
+    private String email;
 }
+
