@@ -19,6 +19,7 @@ public class TaskRequestDto {
     private String rqTicket;
     private String aplicacion;
     private String observacion;
+    private String consultaObservacion;
     private String urlEscenario;
     private Task.TaskStatus status;
     private Task.TaskPriority priority;

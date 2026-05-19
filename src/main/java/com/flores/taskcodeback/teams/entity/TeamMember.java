@@ -30,6 +30,10 @@ public class TeamMember {
     @Column(nullable = false, length = 150)
     private String email;
 
+    /** ID del User creado para este miembro (nullable si se agregó de forma legacy sin cuenta) */
+    @Column(name = "user_id")
+    private Long userId;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     @Builder.Default

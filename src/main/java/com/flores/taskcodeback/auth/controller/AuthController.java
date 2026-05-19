@@ -3,11 +3,14 @@ package com.flores.taskcodeback.auth.controller;
 import com.flores.taskcodeback.auth.dto.*;
 import com.flores.taskcodeback.auth.service.AuthService;
 import com.flores.taskcodeback.auth.service.EmailVerificationService;
+import com.flores.taskcodeback.user.dto.UserDto;
+import com.flores.taskcodeback.user.entity.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -114,6 +117,21 @@ public class AuthController {
     public ResponseEntity<String> generateTeamCode() {
         String code = authService.generateTeamCode();
         return ResponseEntity.ok(code);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> me(@AuthenticationPrincipal User user) {
+        UserDto dto = UserDto.builder()
+                .id(user.getId())
+                .nombre(user.getNombre())
+                .email(user.getEmail())
+                .role(user.getRole())
+                .isIndependent(user.getIsIndependent())
+                .activo(user.getActivo())
+                .createdAt(user.getCreatedAt())
+                .lastLogin(user.getLastLogin())
+                .build();
+        return ResponseEntity.ok(dto);
     }
 }
 

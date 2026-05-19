@@ -38,6 +38,9 @@ public class Task {
     @Column(columnDefinition = "TEXT")
     private String observacion;
 
+    @Column(name = "consulta_observacion", columnDefinition = "TEXT")
+    private String consultaObservacion;
+
     @Column(name = "url_escenario", length = 500)
     private String urlEscenario;
 
@@ -84,7 +87,8 @@ public class Task {
         PENDIENTE("pendiente"),
         EN_PROGRESO("en-progreso"),
         COMPLETADA("completada"),
-        CANCELADA("cancelada");
+        CANCELADA("cancelada"),
+        CONSULTAR("consultar");
 
         private final String value;
 

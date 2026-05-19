@@ -8,6 +8,8 @@ import com.flores.taskcodeback.equipo.entity.Equipo;
 import com.flores.taskcodeback.equipo.repository.EquipoRepository;
 import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.security.JwtTokenProvider;
+import com.flores.taskcodeback.teams.entity.Team;
+import com.flores.taskcodeback.teams.repository.TeamRepository;
 import com.flores.taskcodeback.user.dto.UserDto;
 import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
@@ -31,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final EquipoRepository equipoRepository;
+    private final TeamRepository teamRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -168,33 +171,42 @@ public class AuthServiceImpl implements AuthService {
             teamCode = generateTeamCode();
         } while (equipoRepository.existsByCodigo(teamCode));
 
-        // Crear equipo
-        Equipo equipo = Equipo.builder()
-                .nombre(request.getEquipoNombre())
-                .descripcion(request.getEquipoDescripcion())
-                .codigo(teamCode)
-                .activo(true)
-                .build();
-
-        // Crear líder
+        // PASO 1: Guardar el User SIN equipo (evita referencia circular)
         User leader = User.builder()
                 .nombre(request.getNombre())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(User.Role.TEAM_LEADER)
                 .isIndependent(false)
-                .equipo(equipo)
+                .equipo(null)
                 .createdBy(null)
                 .activo(true)
-                .emailVerified(true) // Email ya verificado
+                .emailVerified(true)
                 .build();
+        User savedLeader = userRepository.save(leader);
 
-        // Asignar líder al equipo
-        equipo.setLeader(leader);
-
-        // Guardar equipo (cascada guarda el líder)
+        // PASO 2: Crear y guardar el Equipo con el líder ya persistido
+        Equipo equipo = Equipo.builder()
+                .nombre(request.getEquipoNombre())
+                .descripcion(request.getEquipoDescripcion())
+                .codigo(teamCode)
+                .leader(savedLeader)
+                .activo(true)
+                .build();
         Equipo savedEquipo = equipoRepository.save(equipo);
-        User savedLeader = savedEquipo.getLeader();
+
+        // PASO 3: Actualizar el User vinculándolo al equipo ya persistido
+        savedLeader.setEquipo(savedEquipo);
+        userRepository.save(savedLeader);
+
+        // PASO 4: Crear el Team en user_teams para que aparezca en GET /api/teams
+        Team team = Team.builder()
+                .owner(savedLeader)
+                .nombre(request.getEquipoNombre())
+                .descripcion(request.getEquipoDescripcion())
+                .codigo(teamCode)
+                .build();
+        teamRepository.save(team);
 
         log.info("Líder de equipo verificado registrado exitosamente: {} con equipo: {}",
                 savedLeader.getEmail(), savedEquipo.getNombre());

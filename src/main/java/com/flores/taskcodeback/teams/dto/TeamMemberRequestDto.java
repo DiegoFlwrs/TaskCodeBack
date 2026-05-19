@@ -20,5 +20,15 @@ public class TeamMemberRequestDto {
 
     private TeamMember.MemberRole role;
     private TeamMember.MemberStatus status;
+
+    /**
+     * "auto"   → backend genera contraseña aleatoria segura y la envía por email
+     * "manual" → backend usa el campo password recibido (se hashea en servidor)
+     * Si viene null se trata como "auto"
+     */
+    private String passwordMode;
+
+    /** Solo obligatorio cuando passwordMode = "manual" */
+    private String password;
 }
 
