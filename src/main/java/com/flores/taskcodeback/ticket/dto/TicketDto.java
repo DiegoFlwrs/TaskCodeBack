@@ -13,6 +13,8 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TicketDto {
     private UUID id;
+    private UUID teamId;
+    private String teamNombre;
     private String codigo;
     private String nombre;
     private String descripcion;
@@ -23,4 +25,3 @@ public class TicketDto {
     private Ticket.TicketStatus status;
     private LocalDateTime createdAt;
 }
-

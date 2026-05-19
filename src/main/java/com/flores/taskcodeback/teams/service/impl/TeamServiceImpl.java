@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
@@ -48,8 +49,19 @@ public class TeamServiceImpl implements TeamService {
     @Transactional(readOnly = true)
     public List<TeamDto> getTeams(String email) {
         User user = getUser(email);
-        return teamRepository.findByOwnerIdOrderByCreatedAtDesc(user.getId())
-                .stream().map(this::toDto).collect(Collectors.toList());
+
+        // Equipos donde el usuario es owner
+        List<Team> teams = new ArrayList<>(
+                teamRepository.findByOwnerIdOrderByCreatedAtDesc(user.getId()));
+
+        // Equipos donde el usuario es miembro (via user_team_members)
+        List<UUID> ownerTeamIds = teams.stream().map(Team::getId).collect(Collectors.toList());
+        teamMemberRepository.findByUserId(user.getId()).stream()
+                .map(TeamMember::getTeam)
+                .filter(team -> !ownerTeamIds.contains(team.getId())) // evitar duplicados
+                .forEach(teams::add);
+
+        return teams.stream().map(this::toDto).collect(Collectors.toList());
     }
 
     @Override
@@ -88,6 +100,32 @@ public class TeamServiceImpl implements TeamService {
         User leader = getUser(email);
         Team team = getTeamForUser(teamId, leader.getId());
 
+        // ── CASO 1: asociar usuario ya existente ──────────────────────────
+        if (request.getExistingUserId() != null) {
+            User existingUser = userRepository.findById(request.getExistingUserId())
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Usuario no encontrado con id: " + request.getExistingUserId()));
+
+            TeamMember member = TeamMember.builder()
+                    .team(team)
+                    .nombre(existingUser.getNombre())
+                    .email(existingUser.getEmail())
+                    .userId(existingUser.getId())
+                    .role(request.getRole() != null ? request.getRole() : TeamMember.MemberRole.DEVELOPER)
+                    .status(request.getStatus() != null ? request.getStatus() : TeamMember.MemberStatus.ACTIVO)
+                    .build();
+
+            return toMemberDto(teamMemberRepository.save(member));
+        }
+
+        // ── CASO 2: crear usuario nuevo ───────────────────────────────────
+        if (request.getNombre() == null || request.getNombre().isBlank()) {
+            throw new BadRequestException("El nombre es requerido para crear un usuario nuevo");
+        }
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            throw new BadRequestException("El email es requerido para crear un usuario nuevo");
+        }
+
         // Verificar que el email no esté ya registrado
         if (userRepository.findByEmail(request.getEmail()).isPresent()) {
             throw new BadRequestException("Ya existe una cuenta con el email: " + request.getEmail());
@@ -113,7 +151,7 @@ public class TeamServiceImpl implements TeamService {
                 .role(User.Role.USER)
                 .isIndependent(false)
                 .activo(true)
-                .emailVerified(true)   // el PM crea la cuenta, verificación no requerida
+                .emailVerified(true)
                 .createdBy(leader)
                 .build();
         User savedUser = userRepository.save(newUser);
@@ -283,5 +321,3 @@ public class TeamServiceImpl implements TeamService {
                 .build();
     }
 }
-
-

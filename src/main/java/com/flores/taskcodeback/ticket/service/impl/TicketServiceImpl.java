@@ -1,6 +1,7 @@
 package com.flores.taskcodeback.ticket.service.impl;
 
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
+import com.flores.taskcodeback.teams.repository.TeamRepository;
 import com.flores.taskcodeback.ticket.dto.TicketDto;
 import com.flores.taskcodeback.ticket.dto.TicketRequestDto;
 import com.flores.taskcodeback.ticket.entity.Ticket;
@@ -26,6 +27,7 @@ public class TicketServiceImpl implements TicketService {
 
     private final TicketRepository ticketRepository;
     private final UserRepository userRepository;
+    private final TeamRepository teamRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -42,6 +44,7 @@ public class TicketServiceImpl implements TicketService {
         User user = getUser(email);
         Ticket ticket = Ticket.builder()
                 .user(user)
+                .teamId(request.getTeamId())
                 .codigo(request.getCodigo())
                 .nombre(request.getNombre())
                 .descripcion(request.getDescripcion())
@@ -63,6 +66,7 @@ public class TicketServiceImpl implements TicketService {
         if (request.getNombre() != null) ticket.setNombre(request.getNombre());
         if (request.getDescripcion() != null) ticket.setDescripcion(request.getDescripcion());
         if (request.getAsignadoPor() != null) ticket.setAsignadoPor(request.getAsignadoPor());
+        if (request.getTeamId() != null) ticket.setTeamId(request.getTeamId());
         if (request.getFechaInicio() != null) ticket.setFechaInicio(request.getFechaInicio());
         if (request.getFechaFin() != null) ticket.setFechaFin(request.getFechaFin());
         if (request.getPriority() != null) ticket.setPriority(request.getPriority());
@@ -93,8 +97,16 @@ public class TicketServiceImpl implements TicketService {
     }
 
     private TicketDto toDto(Ticket ticket) {
+        String teamNombre = null;
+        if (ticket.getTeamId() != null) {
+            teamNombre = teamRepository.findById(ticket.getTeamId())
+                    .map(t -> t.getNombre())
+                    .orElse(null);
+        }
         return TicketDto.builder()
                 .id(ticket.getId())
+                .teamId(ticket.getTeamId())
+                .teamNombre(teamNombre)
                 .codigo(ticket.getCodigo())
                 .nombre(ticket.getNombre())
                 .descripcion(ticket.getDescripcion())
@@ -107,4 +119,3 @@ public class TicketServiceImpl implements TicketService {
                 .build();
     }
 }
-

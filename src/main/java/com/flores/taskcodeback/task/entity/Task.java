@@ -72,6 +72,9 @@ public class Task {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Column(name = "team_id")
+    private UUID teamId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -128,4 +131,3 @@ public class Task {
         }
     }
 }
-

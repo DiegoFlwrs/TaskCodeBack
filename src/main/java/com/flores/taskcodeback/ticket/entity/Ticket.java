@@ -26,6 +26,10 @@ public class Ticket {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    /** ID del equipo (user_teams) al que pertenece este ticket. Nullable para usuarios independientes. */
+    @Column(name = "team_id")
+    private UUID teamId;
+
     @Column(nullable = false, length = 50)
     private String codigo;
 

@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -21,6 +22,9 @@ public class TicketRequestDto {
 
     private String descripcion;
     private String asignadoPor;
+
+    /** ID del equipo al que pertenece este ticket (opcional) */
+    private UUID teamId;
 
     @NotNull(message = "La fecha de inicio es requerida")
     private LocalDate fechaInicio;

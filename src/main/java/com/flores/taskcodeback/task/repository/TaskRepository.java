@@ -21,5 +21,16 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
     List<Task> findByUserIdAndFechaBetween(@Param("userId") Long userId,
                                            @Param("start") LocalDate start,
                                            @Param("end") LocalDate end);
-}
 
+    @Query("SELECT t FROM Task t WHERE t.user.id IN :userIds AND t.fecha BETWEEN :start AND :end ORDER BY t.fecha DESC")
+    List<Task> findByUserIdInAndFechaBetween(@Param("userIds") List<Long> userIds,
+                                             @Param("start") LocalDate start,
+                                             @Param("end") LocalDate end);
+
+    /** Tasks de un usuario dentro de un equipo en un rango de fechas (para stats de equipo) */
+    @Query("SELECT t FROM Task t WHERE t.user.id IN :userIds AND t.teamId = :teamId AND t.fecha BETWEEN :start AND :end ORDER BY t.fecha DESC")
+    List<Task> findByUserIdInAndTeamIdAndFechaBetween(@Param("userIds") List<Long> userIds,
+                                                      @Param("teamId") UUID teamId,
+                                                      @Param("start") LocalDate start,
+                                                      @Param("end") LocalDate end);
+}

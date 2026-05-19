@@ -7,6 +7,7 @@ import com.flores.taskcodeback.task.dto.TaskRequestDto;
 import com.flores.taskcodeback.task.entity.Task;
 import com.flores.taskcodeback.task.repository.TaskRepository;
 import com.flores.taskcodeback.task.service.TaskService;
+import com.flores.taskcodeback.ticket.repository.TicketRepository;
 import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ public class TaskServiceImpl implements TaskService {
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
+    private final TicketRepository ticketRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -66,6 +68,7 @@ public class TaskServiceImpl implements TaskService {
                 .horaFin(request.getHoraFin())
                 .tiempoInvertido(request.getTiempoInvertido())
                 .fecha(request.getFecha())
+                .teamId(inferTeamId(request.getRqTicket()))
                 .build();
 
         return toDto(taskRepository.save(task));
@@ -77,7 +80,6 @@ public class TaskServiceImpl implements TaskService {
         Task task = getTaskForUser(id, user.getId());
 
         if (request.getNombre() != null) task.setNombre(request.getNombre());
-        if (request.getRqTicket() != null) task.setRqTicket(request.getRqTicket());
         if (request.getAplicacion() != null) task.setAplicacion(request.getAplicacion());
         if (request.getObservacion() != null) task.setObservacion(request.getObservacion());
         if (request.getConsultaObservacion() != null) task.setConsultaObservacion(request.getConsultaObservacion());
@@ -89,6 +91,12 @@ public class TaskServiceImpl implements TaskService {
         if (request.getTiempoInvertido() != null) task.setTiempoInvertido(request.getTiempoInvertido());
         if (request.getFecha() != null) task.setFecha(request.getFecha());
 
+        // Re-evaluar teamId si cambia el rqTicket
+        if (request.getRqTicket() != null) {
+            task.setRqTicket(request.getRqTicket());
+            task.setTeamId(inferTeamId(request.getRqTicket()));
+        }
+
         return toDto(taskRepository.save(task));
     }
 
@@ -97,6 +105,19 @@ public class TaskServiceImpl implements TaskService {
         User user = getUser(email);
         Task task = getTaskForUser(id, user.getId());
         taskRepository.delete(task);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /**
+     * Si el código de ticket existe en la BD, retorna su teamId.
+     * Si no existe o el código es vacío → null (tarea personal/sin equipo).
+     */
+    private UUID inferTeamId(String rqTicket) {
+        if (rqTicket == null || rqTicket.isBlank()) return null;
+        return ticketRepository.findFirstByCodigoOrderByCreatedAtDesc(rqTicket)
+                .map(ticket -> ticket.getTeamId())
+                .orElse(null);
     }
 
     private User getUser(String email) {
@@ -132,4 +153,3 @@ public class TaskServiceImpl implements TaskService {
                 .build();
     }
 }
-
