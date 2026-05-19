@@ -1,10 +1,10 @@
 package com.flores.taskcodeback.user.controller;
 
-import com.flores.taskcodeback.equipo.dto.EquipoBasicDto;
+import com.flores.taskcodeback.workspace.dto.EquipoBasicDto;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
-import com.flores.taskcodeback.teams.entity.TeamMember;
-import com.flores.taskcodeback.teams.repository.TeamMemberRepository;
-import com.flores.taskcodeback.teams.repository.TeamRepository;
+import com.flores.taskcodeback.team.entity.TeamMember;
+import com.flores.taskcodeback.team.repository.TeamMemberRepository;
+import com.flores.taskcodeback.team.repository.TeamRepository;
 import com.flores.taskcodeback.user.dto.UserDto;
 import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;

@@ -1,7 +1,7 @@
 
 package com.flores.taskcodeback.user.entity;
 
-import com.flores.taskcodeback.equipo.entity.Equipo;
+import com.flores.taskcodeback.workspace.entity.Equipo;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

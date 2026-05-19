@@ -1,7 +1,7 @@
 package com.flores.taskcodeback.ticket.service.impl;
 
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
-import com.flores.taskcodeback.teams.repository.TeamRepository;
+import com.flores.taskcodeback.team.repository.TeamRepository;
 import com.flores.taskcodeback.ticket.dto.TicketDto;
 import com.flores.taskcodeback.ticket.dto.TicketRequestDto;
 import com.flores.taskcodeback.ticket.entity.Ticket;
