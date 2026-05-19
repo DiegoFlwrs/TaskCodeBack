@@ -101,21 +101,6 @@ public class AuthController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Endpoints existentes (para compatibilidad hacia atrás)
-    @PostMapping("/register")
-    public ResponseEntity<AuthResponseDto> registerIndependent(@Valid @RequestBody RegisterRequestDto request) {
-        log.info("Solicitud de registro independiente recibida para: {}", request.getEmail());
-        AuthResponseDto response = authService.registerIndependent(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
-    @PostMapping("/register-team-leader")
-    public ResponseEntity<AuthResponseDto> registerTeamLeader(@Valid @RequestBody RegisterTeamLeaderRequestDto request) {
-        log.info("Solicitud de registro de líder de equipo recibida para: {}", request.getEmail());
-        AuthResponseDto response = authService.registerTeamLeader(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    }
-
     @PostMapping("/login")
     public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequestDto request) {
         log.info("Solicitud de login recibida para: {}", request.getEmail());
@@ -123,28 +108,6 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String token) {
-        String jwtToken = token.replace("Bearer ", "");
-        authService.logout(jwtToken);
-        return ResponseEntity.ok().build();
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser() {
-        var currentUser = authService.getCurrentUser();
-        return ResponseEntity.ok().body(Map.of(
-            "id", currentUser.getId(),
-            "nombre", currentUser.getNombre(),
-            "email", currentUser.getEmail(),
-            "role", currentUser.getRole(),
-            "isIndependent", currentUser.getIsIndependent(),
-            "equipo", currentUser.getEquipo() != null ?
-                Map.of("id", currentUser.getEquipo().getId(),
-                       "nombre", currentUser.getEquipo().getNombre(),
-                       "codigo", currentUser.getEquipo().getCodigo()) : null
-        ));
-    }
 
 
     @GetMapping("/generate-team-code")

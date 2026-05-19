@@ -7,7 +7,6 @@ import com.flores.taskcodeback.config.JwtConfig;
 import com.flores.taskcodeback.equipo.entity.Equipo;
 import com.flores.taskcodeback.equipo.repository.EquipoRepository;
 import com.flores.taskcodeback.exception.BadRequestException;
-import com.flores.taskcodeback.exception.EmailAlreadyExistsException;
 import com.flores.taskcodeback.security.JwtTokenProvider;
 import com.flores.taskcodeback.user.dto.UserDto;
 import com.flores.taskcodeback.user.entity.User;
@@ -17,7 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,99 +73,6 @@ public class AuthServiceImpl implements AuthService {
         log.info("Contrasena restablecida correctamente para: {}", request.getEmail());
     }
 
-    @Override
-    public AuthResponseDto registerIndependent(RegisterRequestDto request) {
-        log.info("Registrando usuario independiente: {}", request.getEmail());
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException("Ya existe un usuario con el email: " + request.getEmail());
-        }
-
-        User user = User.builder()
-                .nombre(request.getNombre())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.USER)
-                .isIndependent(true)
-                .equipo(null)
-                .createdBy(null)
-                .activo(true)
-                .emailVerified(true) // Por simplicidad, auto-verificamos
-                .build();
-
-        User savedUser = userRepository.save(user);
-        log.info("Usuario independiente registrado exitosamente: {}", savedUser.getEmail());
-
-        // Generar token
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        String token = tokenProvider.generateToken(authentication);
-
-        return AuthResponseDto.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .expiresIn(jwtConfig.getExpiration())
-                .user(mapToUserDto(savedUser))
-                .build();
-    }
-
-    @Override
-    public AuthResponseDto registerTeamLeader(RegisterTeamLeaderRequestDto request) {
-        log.info("Registrando líder de equipo: {}", request.getEmail());
-
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new EmailAlreadyExistsException("Ya existe un usuario con el email: " + request.getEmail());
-        }
-
-        // Generar código único para el equipo
-        String teamCode;
-        do {
-            teamCode = generateTeamCode();
-        } while (equipoRepository.existsByCodigo(teamCode));
-
-        // Crear equipo
-        Equipo equipo = Equipo.builder()
-                .nombre(request.getEquipoNombre())
-                .descripcion(request.getEquipoDescripcion())
-                .codigo(teamCode)
-                .activo(true)
-                .build();
-
-        // Crear líder
-        User leader = User.builder()
-                .nombre(request.getNombre())
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .role(User.Role.TEAM_LEADER)
-                .isIndependent(false)
-                .equipo(equipo)
-                .createdBy(null)
-                .activo(true)
-                .emailVerified(true)
-                .build();
-
-        // Asignar líder al equipo
-        equipo.setLeader(leader);
-
-        // Guardar equipo (cascada guarda el líder)
-        Equipo savedEquipo = equipoRepository.save(equipo);
-        User savedLeader = savedEquipo.getLeader();
-
-        log.info("Líder de equipo registrado exitosamente: {} con equipo: {}",
-                savedLeader.getEmail(), savedEquipo.getNombre());
-
-        // Generar token
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
-        String token = tokenProvider.generateToken(authentication);
-
-        return AuthResponseDto.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .expiresIn(jwtConfig.getExpiration())
-                .user(mapToUserDto(savedLeader))
-                .build();
-    }
 
     @Override
     public AuthResponseDto login(LoginRequestDto request) {
@@ -196,13 +101,6 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public void logout(String token) {
-        // Por ahora, el logout es del lado del cliente
-        // En el futuro se puede implementar blacklist de tokens
-        log.info("Logout realizado");
-    }
-
-    @Override
     public String generateTeamCode() {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         Random random = new Random();
@@ -213,17 +111,6 @@ public class AuthServiceImpl implements AuthService {
         return code.toString();
     }
 
-    @Override
-    public User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()) {
-            throw new BadRequestException("Usuario no autenticado");
-        }
-
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
-    }
 
     private UserDto mapToUserDto(User user) {
         return UserDto.builder()

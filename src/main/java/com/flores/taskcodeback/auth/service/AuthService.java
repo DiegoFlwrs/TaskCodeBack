@@ -1,7 +1,6 @@
 package com.flores.taskcodeback.auth.service;
 
 import com.flores.taskcodeback.auth.dto.*;
-import com.flores.taskcodeback.user.entity.User;
 
 public interface AuthService {
 
@@ -9,11 +8,7 @@ public interface AuthService {
 
     void resetPasswordWithCode(ResetPasswordWithCodeRequestDto request);
 
-    AuthResponseDto registerIndependent(RegisterRequestDto request);
-
-    AuthResponseDto registerTeamLeader(RegisterTeamLeaderRequestDto request);
-
-    // Nuevos métodos para verificación
+    // Registro actual basado en verificacion de email
     AuthResponseDto registerIndependentVerified(RegisterRequestDto request);
 
     AuthResponseDto registerTeamLeaderVerified(RegisterTeamLeaderRequestDto request);
@@ -22,9 +17,5 @@ public interface AuthService {
 
     AuthResponseDto login(LoginRequestDto request);
 
-    void logout(String token);
-
     String generateTeamCode();
-
-    User getCurrentUser();
 }
