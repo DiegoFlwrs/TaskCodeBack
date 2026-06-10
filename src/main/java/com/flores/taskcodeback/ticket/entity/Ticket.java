@@ -39,6 +39,9 @@ public class Ticket {
     @Column(columnDefinition = "TEXT")
     private String descripcion;
 
+    @Column(columnDefinition = "TEXT")
+    private String motivo;
+
     @Column(name = "asignado_por", length = 100)
     private String asignadoPor;
 

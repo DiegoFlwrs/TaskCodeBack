@@ -21,6 +21,7 @@ public class TicketRequestDto {
     private String nombre;
 
     private String descripcion;
+    private String motivo;
     private String asignadoPor;
 
     /** ID del equipo al que pertenece este ticket (opcional) */

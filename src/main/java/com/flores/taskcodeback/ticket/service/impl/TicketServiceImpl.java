@@ -71,6 +71,7 @@ public class TicketServiceImpl implements TicketService {
         if (request.getFechaFin() != null) ticket.setFechaFin(request.getFechaFin());
         if (request.getPriority() != null) ticket.setPriority(request.getPriority());
         if (request.getStatus() != null) ticket.setStatus(request.getStatus());
+        if (request.getMotivo() != null) ticket.setMotivo(request.getMotivo());
 
         return toDto(ticketRepository.save(ticket));
     }
