@@ -15,6 +15,7 @@ public class TaskDto {
     private UUID id;
     private String nombre;
     private String rqTicket;
+    private String solicitante;
     private String aplicacion;
     private String observacion;
     private String consultaObservacion;

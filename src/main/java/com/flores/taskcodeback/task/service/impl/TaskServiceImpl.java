@@ -58,6 +58,7 @@ public class TaskServiceImpl implements TaskService {
                 .user(user)
                 .nombre(request.getNombre())
                 .rqTicket(request.getRqTicket())
+                .solicitante(resolveSolicitante(request.getSolicitante(), request.getRqTicket()))
                 .aplicacion(request.getAplicacion())
                 .observacion(request.getObservacion())
                 .consultaObservacion(request.getConsultaObservacion())
@@ -91,11 +92,15 @@ public class TaskServiceImpl implements TaskService {
         if (request.getTiempoInvertido() != null) task.setTiempoInvertido(request.getTiempoInvertido());
         if (request.getFecha() != null) task.setFecha(request.getFecha());
 
-        // Re-evaluar teamId si cambia el rqTicket
+        // Re-evaluar teamId y solicitante si cambia el rqTicket
         if (request.getRqTicket() != null) {
             task.setRqTicket(request.getRqTicket());
             task.setTeamId(inferTeamId(request.getRqTicket()));
+            if (request.getSolicitante() == null || request.getSolicitante().isBlank()) {
+                task.setSolicitante(inferSolicitante(request.getRqTicket()));
+            }
         }
+        if (request.getSolicitante() != null) task.setSolicitante(request.getSolicitante());
 
         return toDto(taskRepository.save(task));
     }
@@ -120,6 +125,18 @@ public class TaskServiceImpl implements TaskService {
                 .orElse(null);
     }
 
+    private String inferSolicitante(String rqTicket) {
+        if (rqTicket == null || rqTicket.isBlank()) return null;
+        return ticketRepository.findFirstByCodigoOrderByCreatedAtDesc(rqTicket)
+                .map(ticket -> ticket.getAsignadoPor())
+                .orElse(null);
+    }
+
+    private String resolveSolicitante(String solicitante, String rqTicket) {
+        if (solicitante != null && !solicitante.isBlank()) return solicitante;
+        return inferSolicitante(rqTicket);
+    }
+
     private User getUser(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
@@ -139,6 +156,7 @@ public class TaskServiceImpl implements TaskService {
                 .id(task.getId())
                 .nombre(task.getNombre())
                 .rqTicket(task.getRqTicket())
+                .solicitante(task.getSolicitante())
                 .aplicacion(task.getAplicacion())
                 .observacion(task.getObservacion())
                 .consultaObservacion(task.getConsultaObservacion())

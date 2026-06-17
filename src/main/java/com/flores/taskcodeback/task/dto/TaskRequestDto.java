@@ -17,6 +17,7 @@ public class TaskRequestDto {
     private String nombre;
 
     private String rqTicket;
+    private String solicitante;
     private String aplicacion;
     private String observacion;
     private String consultaObservacion;
