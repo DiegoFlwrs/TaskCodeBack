@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -35,5 +36,8 @@ public class TicketRequestDto {
 
     private Ticket.TicketPriority priority;
     private Ticket.TicketStatus status;
+
+    /** IDs de miembros del equipo a asignar (solo TEAM_LEADER) */
+    private List<UUID> assignedMemberIds;
 }
 
