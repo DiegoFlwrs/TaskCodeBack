@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.ticket.service.impl;
 
+import com.flores.taskcodeback.config.CacheInvalidationService;
+import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
 import com.flores.taskcodeback.team.entity.TeamMember;
@@ -14,6 +16,7 @@ import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,8 +35,10 @@ public class TicketServiceImpl implements TicketService {
     private final UserRepository userRepository;
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(value = CacheNames.TICKETS, key = "#email + ':' + @cacheKeyBuilder.ticketKey(#status != null ? #status.name() : null)")
     @Transactional(readOnly = true)
     public List<TicketDto> getTickets(String email, Ticket.TicketStatus status) {
         User user = getUser(email);
@@ -93,7 +98,7 @@ public class TicketServiceImpl implements TicketService {
             ticket = ticketRepository.save(ticket);
         }
 
-        return toDto(ticket, user);
+        return invalidateAndReturn(email, toDto(ticket, user));
     }
 
     @Override
@@ -127,7 +132,7 @@ public class TicketServiceImpl implements TicketService {
             syncAssignedMembers(ticket, request.getAssignedMemberIds(), user);
         }
 
-        return toDto(ticketRepository.save(ticket), user);
+        return invalidateAndReturn(email, toDto(ticketRepository.save(ticket), user));
     }
 
     @Override
@@ -135,6 +140,7 @@ public class TicketServiceImpl implements TicketService {
         User user = getUser(email);
         Ticket ticket = getTicketForManagement(id, user);
         ticketRepository.delete(ticket);
+        cacheInvalidationService.evictTickets(email);
     }
 
     @Override
@@ -160,7 +166,7 @@ public class TicketServiceImpl implements TicketService {
         ticket.setExtensionMotivo(request.getMotivo());
         ticket.setExtensionSolicitadaPorUserId(user.getId());
 
-        return toDto(ticketRepository.save(ticket), user);
+        return invalidateAndReturn(email, toDto(ticketRepository.save(ticket), user));
     }
 
     @Override
@@ -181,7 +187,12 @@ public class TicketServiceImpl implements TicketService {
         }
 
         clearExtensionRequest(ticket);
-        return toDto(ticketRepository.save(ticket), user);
+        return invalidateAndReturn(email, toDto(ticketRepository.save(ticket), user));
+    }
+
+    private TicketDto invalidateAndReturn(String email, TicketDto dto) {
+        cacheInvalidationService.evictTickets(email);
+        return dto;
     }
 
     private void validateTicketRequest(TicketRequestDto request, User user, UUID excludeId) {

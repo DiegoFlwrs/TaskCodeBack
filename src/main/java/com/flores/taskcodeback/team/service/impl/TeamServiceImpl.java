@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.team.service.impl;
 
+import com.flores.taskcodeback.config.CacheInvalidationService;
+import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.application.repository.AppRepository;
 import com.flores.taskcodeback.email.service.EmailService;
 import com.flores.taskcodeback.exception.BadRequestException;
@@ -16,6 +18,7 @@ import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,10 +45,10 @@ public class TeamServiceImpl implements TeamService {
     private final TaskRepository taskRepository;
     private final TicketRepository ticketRepository;
     private final AppRepository appRepository;
-
-    // ...existing getTeams, createTeam, updateTeam, deleteTeam...
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(value = CacheNames.TEAMS, key = "#email")
     @Transactional(readOnly = true)
     public List<TeamDto> getTeams(String email) {
         User user = getUser(email);
@@ -76,7 +79,9 @@ public class TeamServiceImpl implements TeamService {
                 .descripcion(request.getDescripcion())
                 .codigo(code)
                 .build();
-        return toDto(teamRepository.save(team));
+        TeamDto result = toDto(teamRepository.save(team));
+        cacheInvalidationService.evictTeams(email);
+        return result;
     }
 
     @Override
@@ -85,7 +90,9 @@ public class TeamServiceImpl implements TeamService {
         Team team = getTeamForUser(id, user.getId());
         if (request.getNombre() != null) team.setNombre(request.getNombre());
         if (request.getDescripcion() != null) team.setDescripcion(request.getDescripcion());
-        return toDto(teamRepository.save(team));
+        TeamDto result = toDto(teamRepository.save(team));
+        cacheInvalidationService.evictTeams(email);
+        return result;
     }
 
     @Override
@@ -93,6 +100,7 @@ public class TeamServiceImpl implements TeamService {
         User user = getUser(email);
         Team team = getTeamForUser(id, user.getId());
         teamRepository.delete(team);
+        cacheInvalidationService.evictTeams(email);
     }
 
     @Override
@@ -119,7 +127,7 @@ public class TeamServiceImpl implements TeamService {
                     .status(request.getStatus() != null ? request.getStatus() : TeamMember.MemberStatus.ACTIVO)
                     .build();
 
-            return toMemberDto(teamMemberRepository.save(member));
+            return invalidateMemberChange(email, toMemberDto(teamMemberRepository.save(member)));
         }
 
         // ── CASO 2: crear usuario nuevo ───────────────────────────────────
@@ -190,7 +198,13 @@ public class TeamServiceImpl implements TeamService {
             log.warn("No se pudo enviar email de bienvenida a {}: {}", request.getEmail(), ex.getMessage());
         }
 
-        return toMemberDto(saved);
+        return invalidateMemberChange(email, toMemberDto(saved));
+    }
+
+    private TeamMemberDto invalidateMemberChange(String email, TeamMemberDto dto) {
+        cacheInvalidationService.evictTeams(email);
+        cacheInvalidationService.evictAllTeamMembers();
+        return dto;
     }
 
     @Override
@@ -237,7 +251,7 @@ public class TeamServiceImpl implements TeamService {
             }
         }
 
-        return toMemberDto(teamMemberRepository.save(member));
+        return invalidateMemberChange(email, toMemberDto(teamMemberRepository.save(member)));
     }
 
     @Override
@@ -253,6 +267,8 @@ public class TeamServiceImpl implements TeamService {
 
         Long userId = member.getUserId();
         teamMemberRepository.delete(member);
+        cacheInvalidationService.evictTeams(email);
+        cacheInvalidationService.evictAllTeamMembers();
 
         if (userId == null) {
             return DeleteMemberResultDto.builder()
