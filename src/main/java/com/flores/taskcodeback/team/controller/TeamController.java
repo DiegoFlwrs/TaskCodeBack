@@ -1,9 +1,11 @@
 package com.flores.taskcodeback.team.controller;
 
+import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
 import com.flores.taskcodeback.task.entity.Task;
 import com.flores.taskcodeback.task.repository.TaskRepository;
 import com.flores.taskcodeback.team.dto.*;
+import com.flores.taskcodeback.team.entity.Team;
 import com.flores.taskcodeback.team.entity.TeamMember;
 import com.flores.taskcodeback.team.repository.TeamMemberRepository;
 import com.flores.taskcodeback.team.repository.TeamRepository;
@@ -17,9 +19,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -51,7 +55,7 @@ public class TeamController {
     public ResponseEntity<TeamDto> updateTeam(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody TeamRequestDto request) {
+            @Valid @RequestBody TeamRequestDto request) {
         return ResponseEntity.ok(teamService.updateTeam(userDetails.getUsername(), id, request));
     }
 
@@ -77,17 +81,16 @@ public class TeamController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID teamId,
             @PathVariable UUID memberId,
-            @RequestBody TeamMemberRequestDto request) {
+            @Valid @RequestBody TeamMemberRequestDto request) {
         return ResponseEntity.ok(teamService.updateMember(userDetails.getUsername(), teamId, memberId, request));
     }
 
     @DeleteMapping("/{teamId}/members/{memberId}")
-    public ResponseEntity<Void> deleteMember(
+    public ResponseEntity<DeleteMemberResultDto> deleteMember(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID teamId,
             @PathVariable UUID memberId) {
-        teamService.deleteMember(userDetails.getUsername(), teamId, memberId);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(teamService.deleteMember(userDetails.getUsername(), teamId, memberId));
     }
 
     /**
@@ -103,8 +106,20 @@ public class TeamController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
             @RequestParam(required = false) UUID memberId) {
 
-        teamRepository.findById(teamId)
+        Team team = teamRepository.findById(teamId)
                 .orElseThrow(() -> new ResourceNotFoundException("Equipo no encontrado"));
+
+        String email = userDetails.getUsername();
+        boolean isOwner = team.getOwner().getEmail().equalsIgnoreCase(email);
+        boolean isMember = teamMemberRepository.findByTeamId(teamId).stream()
+                .anyMatch(m -> email.equalsIgnoreCase(m.getEmail()));
+        if (!isOwner && !isMember) {
+            throw new AccessDeniedException("No tienes acceso a las estadísticas de este equipo");
+        }
+
+        if (fechaInicio.isAfter(fechaFin)) {
+            throw new BadRequestException("fechaInicio no puede ser posterior a fechaFin");
+        }
 
         // Obtener miembros del equipo
         List<TeamMember> allMembers = teamMemberRepository.findByTeamId(teamId);
@@ -167,23 +182,45 @@ public class TeamController {
                 .mapToLong(t -> parseTiempoToMinutos(t.getTiempoInvertido()))
                 .sum();
 
+        long completada = tasks.stream()
+                .filter(t -> t.getStatus() == Task.TaskStatus.COMPLETADA)
+                .count();
+        long pendiente = tasks.stream()
+                .filter(t -> t.getStatus() != Task.TaskStatus.COMPLETADA
+                        && t.getStatus() != Task.TaskStatus.CANCELADA)
+                .count();
+        long tiempoPromedio = completada > 0 ? tiempoTotal / completada : 0;
+
         return TeamStatsDto.TaskStats.builder()
                 .total(tasks.size())
-                .pendiente(tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.PENDIENTE).count())
-                .enProgreso(tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.EN_PROGRESO).count())
-                .completada(tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.COMPLETADA).count())
-                .cancelada(tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.CANCELADA).count())
-                .consultar(tasks.stream().filter(t -> t.getStatus() == Task.TaskStatus.CONSULTAR).count())
+                .pendiente(pendiente)
+                .completada(completada)
                 .tiempoTotalMinutos(tiempoTotal)
+                .tiempoPromedioMinutos(tiempoPromedio)
                 .build();
     }
 
     private TeamStatsDto.TicketStats buildTicketStats(List<Ticket> tickets) {
+        LocalDate today = LocalDate.now();
+        LocalDate proximoLimite = today.plusDays(3);
+
+        long vencido = tickets.stream()
+                .filter(t -> t.getStatus() == Ticket.TicketStatus.ACTIVO
+                        && t.getFechaFin().isBefore(today))
+                .count();
+        long venceProximo = tickets.stream()
+                .filter(t -> t.getStatus() == Ticket.TicketStatus.ACTIVO
+                        && !t.getFechaFin().isBefore(today)
+                        && !t.getFechaFin().isAfter(proximoLimite))
+                .count();
+
         return TeamStatsDto.TicketStats.builder()
                 .total(tickets.size())
                 .activo(tickets.stream().filter(t -> t.getStatus() == Ticket.TicketStatus.ACTIVO).count())
                 .completado(tickets.stream().filter(t -> t.getStatus() == Ticket.TicketStatus.COMPLETADO).count())
                 .cancelado(tickets.stream().filter(t -> t.getStatus() == Ticket.TicketStatus.CANCELADO).count())
+                .vencido(vencido)
+                .venceProximo(venceProximo)
                 .porPrioridad(TeamStatsDto.PorPrioridad.builder()
                         .alta(tickets.stream().filter(t -> t.getPriority() == Ticket.TicketPriority.ALTA).count())
                         .media(tickets.stream().filter(t -> t.getPriority() == Ticket.TicketPriority.MEDIA).count())

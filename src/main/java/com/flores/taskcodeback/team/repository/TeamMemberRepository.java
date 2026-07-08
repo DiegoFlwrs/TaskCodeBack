@@ -15,5 +15,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, UUID> {
 
     /** Todos los miembros de un equipo */
     List<TeamMember> findByTeamId(UUID teamId);
+
+    boolean existsByTeamIdAndUserId(UUID teamId, Long userId);
 }
 

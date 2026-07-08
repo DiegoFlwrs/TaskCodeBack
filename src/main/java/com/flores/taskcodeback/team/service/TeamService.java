@@ -13,6 +13,6 @@ public interface TeamService {
 
     TeamMemberDto addMember(String email, UUID teamId, TeamMemberRequestDto request);
     TeamMemberDto updateMember(String email, UUID teamId, UUID memberId, TeamMemberRequestDto request);
-    void deleteMember(String email, UUID teamId, UUID memberId);
+    DeleteMemberResultDto deleteMember(String email, UUID teamId, UUID memberId);
 }
 

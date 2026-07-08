@@ -3,6 +3,7 @@ package com.flores.taskcodeback.ticket.service.impl;
 import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
 import com.flores.taskcodeback.team.entity.TeamMember;
+import com.flores.taskcodeback.team.entity.Team;
 import com.flores.taskcodeback.team.repository.TeamMemberRepository;
 import com.flores.taskcodeback.team.repository.TeamRepository;
 import com.flores.taskcodeback.ticket.dto.*;
@@ -17,6 +18,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -67,7 +69,9 @@ public class TicketServiceImpl implements TicketService {
     @Override
     public TicketDto createTicket(String email, TicketRequestDto request) {
         User user = getUser(email);
+        validateTicketRequest(request, user, null);
         validateUniqueNombre(request.getTeamId(), user.getId(), request.getNombre(), null);
+        validateUniqueCodigo(request.getTeamId(), user.getId(), request.getCodigo(), null);
 
         Ticket ticket = Ticket.builder()
                 .user(user)
@@ -99,7 +103,14 @@ public class TicketServiceImpl implements TicketService {
 
         UUID teamId = request.getTeamId() != null ? request.getTeamId() : ticket.getTeamId();
         String nombre = request.getNombre() != null ? request.getNombre() : ticket.getNombre();
+        String codigo = request.getCodigo() != null ? request.getCodigo() : ticket.getCodigo();
+        LocalDate fechaInicio = request.getFechaInicio() != null ? request.getFechaInicio() : ticket.getFechaInicio();
+        LocalDate fechaFin = request.getFechaFin() != null ? request.getFechaFin() : ticket.getFechaFin();
+
+        validateDateRange(fechaInicio, fechaFin);
+        validateTeamAccess(teamId, user);
         validateUniqueNombre(teamId, user.getId(), nombre, ticket.getId());
+        validateUniqueCodigo(teamId, user.getId(), codigo, ticket.getId());
 
         if (request.getCodigo() != null) ticket.setCodigo(request.getCodigo());
         if (request.getNombre() != null) ticket.setNombre(request.getNombre());
@@ -171,6 +182,59 @@ public class TicketServiceImpl implements TicketService {
 
         clearExtensionRequest(ticket);
         return toDto(ticketRepository.save(ticket), user);
+    }
+
+    private void validateTicketRequest(TicketRequestDto request, User user, UUID excludeId) {
+        validateDateRange(request.getFechaInicio(), request.getFechaFin());
+        validateTeamAccess(request.getTeamId(), user);
+    }
+
+    private void validateDateRange(LocalDate fechaInicio, LocalDate fechaFin) {
+        if (fechaInicio == null || fechaFin == null) {
+            return;
+        }
+        if (fechaFin.isBefore(fechaInicio)) {
+            throw new BadRequestException("La fecha de fin no puede ser anterior a la fecha de inicio");
+        }
+    }
+
+    private void validateTeamAccess(UUID teamId, User user) {
+        if (teamId == null) {
+            return;
+        }
+
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new BadRequestException("El equipo especificado no existe"));
+
+        boolean isOwner = team.getOwner().getId().equals(user.getId());
+        boolean isMember = teamMemberRepository.existsByTeamIdAndUserId(teamId, user.getId());
+
+        if (!isOwner && !isMember) {
+            throw new AccessDeniedException("No tienes acceso al equipo especificado");
+        }
+    }
+
+    private void validateUniqueCodigo(UUID teamId, Long userId, String codigo, UUID excludeId) {
+        if (codigo == null || codigo.isBlank()) {
+            return;
+        }
+
+        String normalized = codigo.trim();
+        boolean exists;
+
+        if (teamId != null) {
+            exists = excludeId == null
+                    ? ticketRepository.existsByTeamIdAndCodigoIgnoreCase(teamId, normalized)
+                    : ticketRepository.existsByTeamIdAndCodigoIgnoreCaseAndIdNot(teamId, normalized, excludeId);
+        } else {
+            exists = excludeId == null
+                    ? ticketRepository.existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCase(userId, normalized)
+                    : ticketRepository.existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCaseAndIdNot(userId, normalized, excludeId);
+        }
+
+        if (exists) {
+            throw new BadRequestException("Ya existe un ticket con el código \"" + normalized + "\"");
+        }
     }
 
     private void validateUniqueNombre(UUID teamId, Long userId, String nombre, UUID excludeId) {

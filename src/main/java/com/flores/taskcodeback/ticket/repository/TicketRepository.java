@@ -42,4 +42,12 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
     boolean existsByUserIdAndTeamIdIsNullAndNombreIgnoreCase(Long userId, String nombre);
 
     boolean existsByUserIdAndTeamIdIsNullAndNombreIgnoreCaseAndIdNot(Long userId, String nombre, UUID id);
+
+    boolean existsByTeamIdAndCodigoIgnoreCase(UUID teamId, String codigo);
+
+    boolean existsByTeamIdAndCodigoIgnoreCaseAndIdNot(UUID teamId, String codigo, UUID id);
+
+    boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCase(Long userId, String codigo);
+
+    boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCaseAndIdNot(Long userId, String codigo, UUID id);
 }

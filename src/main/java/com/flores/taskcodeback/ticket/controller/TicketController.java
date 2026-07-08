@@ -42,7 +42,7 @@ public class TicketController {
     public ResponseEntity<TicketDto> updateTicket(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody TicketRequestDto request) {
+            @Valid @RequestBody TicketRequestDto request) {
         return ResponseEntity.ok(ticketService.updateTicket(userDetails.getUsername(), id, request));
     }
 
