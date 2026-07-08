@@ -63,6 +63,13 @@ public class User implements UserDetails {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -110,7 +117,13 @@ public class User implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return activo;
+        if (!Boolean.TRUE.equals(activo)) {
+            return false;
+        }
+        if (lockedUntil != null && LocalDateTime.now().isBefore(lockedUntil)) {
+            return false;
+        }
+        return true;
     }
 
     @Override

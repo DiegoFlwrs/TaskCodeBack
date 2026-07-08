@@ -3,6 +3,7 @@ package com.flores.taskcodeback.auth.service.impl;
 import com.flores.taskcodeback.auth.dto.*;
 import com.flores.taskcodeback.auth.service.AuthService;
 import com.flores.taskcodeback.auth.service.EmailVerificationService;
+import com.flores.taskcodeback.auth.service.LoginAttemptService;
 import com.flores.taskcodeback.config.JwtConfig;
 import com.flores.taskcodeback.workspace.entity.Equipo;
 import com.flores.taskcodeback.workspace.repository.EquipoRepository;
@@ -16,6 +17,8 @@ import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -39,6 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtTokenProvider tokenProvider;
     private final JwtConfig jwtConfig;
     private final EmailVerificationService emailVerificationService;
+    private final LoginAttemptService loginAttemptService;
 
     @Override
     public void sendPasswordResetCode(ForgotPasswordRequestDto request) {
@@ -71,6 +75,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        loginAttemptService.resetFailedAttempts(user);
         userRepository.save(user);
 
         log.info("Contrasena restablecida correctamente para: {}", request.getEmail());
@@ -81,26 +86,41 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponseDto login(LoginRequestDto request) {
         log.info("Intento de login para: {}", request.getEmail());
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        User user = userRepository.findByEmail(request.getEmail()).orElse(null);
+        if (user != null) {
+            loginAttemptService.assertNotLocked(user);
+        }
 
-        // Actualizar último login
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
 
-        user.setLastLogin(LocalDateTime.now());
-        userRepository.save(user);
+            user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new BadRequestException("Usuario no encontrado"));
 
-        String token = tokenProvider.generateToken(authentication);
+            loginAttemptService.onSuccessfulLogin(user);
 
-        log.info("Login exitoso para: {}", request.getEmail());
+            String token = tokenProvider.generateToken(authentication);
 
-        return AuthResponseDto.builder()
-                .token(token)
-                .tokenType("Bearer")
-                .expiresIn(jwtConfig.getExpiration())
-                .user(mapToUserDto(user))
-                .build();
+            log.info("Login exitoso para: {}", request.getEmail());
+
+            return AuthResponseDto.builder()
+                    .token(token)
+                    .tokenType("Bearer")
+                    .expiresIn(jwtConfig.getExpiration())
+                    .user(mapToUserDto(user))
+                    .build();
+        } catch (BadCredentialsException e) {
+            if (user != null) {
+                loginAttemptService.onFailedLogin(user);
+            }
+            throw new BadCredentialsException("Email o contraseña incorrectos");
+        } catch (LockedException e) {
+            if (user != null) {
+                throw new BadRequestException(loginAttemptService.getLockMessage(user));
+            }
+            throw new BadRequestException("Tu cuenta está bloqueada temporalmente. Intenta más tarde.");
+        }
     }
 
     @Override
@@ -132,7 +152,10 @@ public class AuthServiceImpl implements AuthService {
     public AuthResponseDto registerIndependentVerified(RegisterRequestDto request) {
         log.info("Registrando usuario independiente verificado: {}", request.getEmail());
 
-        // No verificamos email duplicado aquí porque ya fue verificado en el paso anterior
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Ya existe una cuenta con este email");
+        }
+
         User user = User.builder()
                 .nombre(request.getNombre())
                 .email(request.getEmail())
@@ -164,6 +187,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponseDto registerTeamLeaderVerified(RegisterTeamLeaderRequestDto request) {
         log.info("Registrando líder de equipo verificado: {}", request.getEmail());
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BadRequestException("Ya existe una cuenta con este email");
+        }
 
         // Generar código único para el equipo
         String teamCode;

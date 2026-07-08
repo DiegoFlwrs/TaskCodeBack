@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.application.service.impl;
 
+import com.flores.taskcodeback.config.CacheInvalidationService;
+import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.application.dto.AppDto;
 import com.flores.taskcodeback.application.dto.AppRequestDto;
 import com.flores.taskcodeback.application.entity.Aplicacion;
@@ -10,6 +12,7 @@ import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,8 +29,10 @@ public class AppServiceImpl implements AppService {
 
     private final AppRepository appRepository;
     private final UserRepository userRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(value = CacheNames.APPS, key = "#email")
     @Transactional(readOnly = true)
     public List<AppDto> getApps(String email) {
         User user = getUser(email);
@@ -45,7 +50,9 @@ public class AppServiceImpl implements AppService {
                 .url(request.getUrl())
                 .color(request.getColor())
                 .build();
-        return toDto(appRepository.save(app));
+        AppDto result = toDto(appRepository.save(app));
+        cacheInvalidationService.evictApps(email);
+        return result;
     }
 
     @Override
@@ -58,7 +65,9 @@ public class AppServiceImpl implements AppService {
         if (request.getUrl() != null) app.setUrl(request.getUrl());
         if (request.getColor() != null) app.setColor(request.getColor());
 
-        return toDto(appRepository.save(app));
+        AppDto result = toDto(appRepository.save(app));
+        cacheInvalidationService.evictApps(email);
+        return result;
     }
 
     @Override
@@ -66,6 +75,7 @@ public class AppServiceImpl implements AppService {
         User user = getUser(email);
         Aplicacion app = getAppForUser(id, user.getId());
         appRepository.delete(app);
+        cacheInvalidationService.evictApps(email);
     }
 
     private User getUser(String email) {

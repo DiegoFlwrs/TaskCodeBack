@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -24,4 +25,11 @@ public class TicketDto {
     private Ticket.TicketPriority priority;
     private Ticket.TicketStatus status;
     private LocalDateTime createdAt;
+    private List<TicketAssignedMemberDto> assignedMembers;
+    private Boolean canEdit;
+    private Boolean canDelete;
+    private Boolean canExtendDirectly;
+    private Boolean canRequestExtension;
+    private Boolean canReviewExtension;
+    private TicketPendingExtensionDto pendingExtension;
 }

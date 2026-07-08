@@ -2,12 +2,15 @@ package com.flores.taskcodeback.ticket.entity;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.flores.taskcodeback.team.entity.TeamMember;
 import com.flores.taskcodeback.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -66,6 +69,28 @@ public class Ticket {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "ticket_assignments",
+            joinColumns = @JoinColumn(name = "ticket_id"),
+            inverseJoinColumns = @JoinColumn(name = "team_member_id")
+    )
+    @Builder.Default
+    private List<TeamMember> assignedMembers = new ArrayList<>();
+
+    @Column(name = "extension_pendiente")
+    @Builder.Default
+    private Boolean extensionPendiente = false;
+
+    @Column(name = "extension_fecha_solicitada")
+    private LocalDate extensionFechaSolicitada;
+
+    @Column(name = "extension_motivo", columnDefinition = "TEXT")
+    private String extensionMotivo;
+
+    @Column(name = "extension_solicitada_por")
+    private Long extensionSolicitadaPorUserId;
 
     @PrePersist
     protected void onCreate() {

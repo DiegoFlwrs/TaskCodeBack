@@ -25,4 +25,29 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
 
     /** Buscar ticket por su código para inferir el equipo al crear una tarea */
     Optional<Ticket> findFirstByCodigoOrderByCreatedAtDesc(String codigo);
+
+    @Query("SELECT DISTINCT t FROM Ticket t JOIN t.assignedMembers am WHERE am.id IN :memberIds ORDER BY t.createdAt DESC")
+    List<Ticket> findByAssignedMemberIdIn(@Param("memberIds") List<UUID> memberIds);
+
+    @Query("SELECT DISTINCT t FROM Ticket t JOIN t.assignedMembers am WHERE am.id IN :memberIds AND t.status = :status ORDER BY t.createdAt DESC")
+    List<Ticket> findByAssignedMemberIdInAndStatus(@Param("memberIds") List<UUID> memberIds, @Param("status") Ticket.TicketStatus status);
+
+    @Query("SELECT DISTINCT t FROM Ticket t LEFT JOIN FETCH t.assignedMembers WHERE t.id IN :ids")
+    List<Ticket> findAllByIdInWithAssignments(@Param("ids") List<UUID> ids);
+
+    boolean existsByTeamIdAndNombreIgnoreCase(UUID teamId, String nombre);
+
+    boolean existsByTeamIdAndNombreIgnoreCaseAndIdNot(UUID teamId, String nombre, UUID id);
+
+    boolean existsByUserIdAndTeamIdIsNullAndNombreIgnoreCase(Long userId, String nombre);
+
+    boolean existsByUserIdAndTeamIdIsNullAndNombreIgnoreCaseAndIdNot(Long userId, String nombre, UUID id);
+
+    boolean existsByTeamIdAndCodigoIgnoreCase(UUID teamId, String codigo);
+
+    boolean existsByTeamIdAndCodigoIgnoreCaseAndIdNot(UUID teamId, String codigo, UUID id);
+
+    boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCase(Long userId, String codigo);
+
+    boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCaseAndIdNot(Long userId, String codigo, UUID id);
 }

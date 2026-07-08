@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.task.service.impl;
 
+import com.flores.taskcodeback.config.CacheInvalidationService;
+import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
 import com.flores.taskcodeback.task.dto.TaskDto;
@@ -12,6 +14,7 @@ import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,8 +32,10 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TicketRepository ticketRepository;
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(value = CacheNames.TASKS, key = "#email + ':' + @cacheKeyBuilder.taskKey(#fecha, #fechaInicio, #fechaFin)")
     @Transactional(readOnly = true)
     public List<TaskDto> getTasks(String email, LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin) {
         User user = getUser(email);
@@ -58,6 +63,7 @@ public class TaskServiceImpl implements TaskService {
                 .user(user)
                 .nombre(request.getNombre())
                 .rqTicket(request.getRqTicket())
+                .solicitante(resolveSolicitante(request.getSolicitante(), request.getRqTicket()))
                 .aplicacion(request.getAplicacion())
                 .observacion(request.getObservacion())
                 .consultaObservacion(request.getConsultaObservacion())
@@ -71,7 +77,9 @@ public class TaskServiceImpl implements TaskService {
                 .teamId(inferTeamId(request.getRqTicket()))
                 .build();
 
-        return toDto(taskRepository.save(task));
+        TaskDto result = toDto(taskRepository.save(task));
+        cacheInvalidationService.evictTasks(email);
+        return result;
     }
 
     @Override
@@ -91,13 +99,19 @@ public class TaskServiceImpl implements TaskService {
         if (request.getTiempoInvertido() != null) task.setTiempoInvertido(request.getTiempoInvertido());
         if (request.getFecha() != null) task.setFecha(request.getFecha());
 
-        // Re-evaluar teamId si cambia el rqTicket
+        // Re-evaluar teamId y solicitante si cambia el rqTicket
         if (request.getRqTicket() != null) {
             task.setRqTicket(request.getRqTicket());
             task.setTeamId(inferTeamId(request.getRqTicket()));
+            if (request.getSolicitante() == null || request.getSolicitante().isBlank()) {
+                task.setSolicitante(inferSolicitante(request.getRqTicket()));
+            }
         }
+        if (request.getSolicitante() != null) task.setSolicitante(request.getSolicitante());
 
-        return toDto(taskRepository.save(task));
+        TaskDto result = toDto(taskRepository.save(task));
+        cacheInvalidationService.evictTasks(email);
+        return result;
     }
 
     @Override
@@ -105,6 +119,7 @@ public class TaskServiceImpl implements TaskService {
         User user = getUser(email);
         Task task = getTaskForUser(id, user.getId());
         taskRepository.delete(task);
+        cacheInvalidationService.evictTasks(email);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -118,6 +133,18 @@ public class TaskServiceImpl implements TaskService {
         return ticketRepository.findFirstByCodigoOrderByCreatedAtDesc(rqTicket)
                 .map(ticket -> ticket.getTeamId())
                 .orElse(null);
+    }
+
+    private String inferSolicitante(String rqTicket) {
+        if (rqTicket == null || rqTicket.isBlank()) return null;
+        return ticketRepository.findFirstByCodigoOrderByCreatedAtDesc(rqTicket)
+                .map(ticket -> ticket.getAsignadoPor())
+                .orElse(null);
+    }
+
+    private String resolveSolicitante(String solicitante, String rqTicket) {
+        if (solicitante != null && !solicitante.isBlank()) return solicitante;
+        return inferSolicitante(rqTicket);
     }
 
     private User getUser(String email) {
@@ -139,6 +166,7 @@ public class TaskServiceImpl implements TaskService {
                 .id(task.getId())
                 .nombre(task.getNombre())
                 .rqTicket(task.getRqTicket())
+                .solicitante(task.getSolicitante())
                 .aplicacion(task.getAplicacion())
                 .observacion(task.getObservacion())
                 .consultaObservacion(task.getConsultaObservacion())

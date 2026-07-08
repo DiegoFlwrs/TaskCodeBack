@@ -25,11 +25,9 @@ public class TeamStatsDto {
     public static class TaskStats {
         private long total;
         private long pendiente;
-        private long enProgreso;
         private long completada;
-        private long cancelada;
-        private long consultar;
         private long tiempoTotalMinutos;
+        private long tiempoPromedioMinutos;
     }
 
     @Data
@@ -41,6 +39,8 @@ public class TeamStatsDto {
         private long activo;
         private long completado;
         private long cancelado;
+        private long vencido;
+        private long venceProximo;
         private PorPrioridad porPrioridad;
     }
 
@@ -54,4 +54,3 @@ public class TeamStatsDto {
         private long baja;
     }
 }
-

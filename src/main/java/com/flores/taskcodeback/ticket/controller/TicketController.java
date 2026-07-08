@@ -1,6 +1,8 @@
 package com.flores.taskcodeback.ticket.controller;
 
 import com.flores.taskcodeback.ticket.dto.TicketDto;
+import com.flores.taskcodeback.ticket.dto.TicketExtensionRequestDto;
+import com.flores.taskcodeback.ticket.dto.TicketExtensionReviewDto;
 import com.flores.taskcodeback.ticket.dto.TicketRequestDto;
 import com.flores.taskcodeback.ticket.entity.Ticket;
 import com.flores.taskcodeback.ticket.service.TicketService;
@@ -40,7 +42,7 @@ public class TicketController {
     public ResponseEntity<TicketDto> updateTicket(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody TicketRequestDto request) {
+            @Valid @RequestBody TicketRequestDto request) {
         return ResponseEntity.ok(ticketService.updateTicket(userDetails.getUsername(), id, request));
     }
 
@@ -50,6 +52,22 @@ public class TicketController {
             @PathVariable UUID id) {
         ticketService.deleteTicket(userDetails.getUsername(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/extension-request")
+    public ResponseEntity<TicketDto> requestExtension(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable UUID id,
+            @Valid @RequestBody TicketExtensionRequestDto request) {
+        return ResponseEntity.ok(ticketService.requestExtension(userDetails.getUsername(), id, request));
+    }
+
+    @PostMapping("/{id}/extension-review")
+    public ResponseEntity<TicketDto> reviewExtension(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable UUID id,
+            @Valid @RequestBody TicketExtensionReviewDto review) {
+        return ResponseEntity.ok(ticketService.reviewExtension(userDetails.getUsername(), id, review));
     }
 }
 

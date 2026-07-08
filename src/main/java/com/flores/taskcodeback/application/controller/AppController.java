@@ -37,7 +37,7 @@ public class AppController {
     public ResponseEntity<AppDto> updateApp(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody AppRequestDto request) {
+            @Valid @RequestBody AppRequestDto request) {
         return ResponseEntity.ok(appService.updateApp(userDetails.getUsername(), id, request));
     }
 

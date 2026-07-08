@@ -1,12 +1,25 @@
-FROM eclipse-temurin:21-jdk
+# ── Build ─────────────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jdk-alpine AS builder
 
 WORKDIR /app
 
-COPY . .
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
 
-RUN chmod +x mvnw
-RUN ./mvnw clean package -DskipTests
+COPY src ./src
+RUN ./mvnw clean package -DskipTests -B
+
+# ── Run ───────────────────────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+RUN addgroup -S app && adduser -S app -G app
+USER app
+
+COPY --from=builder /app/target/*.jar app.jar
 
 EXPOSE 8080
 
-CMD sh -c "java -jar target/*.jar"
+ENTRYPOINT ["sh", "-c", "java ${JAVA_OPTS:--Xmx512m -Xms256m} -jar app.jar"]

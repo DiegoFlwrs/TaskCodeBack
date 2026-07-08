@@ -2,6 +2,7 @@ package com.flores.taskcodeback.team.dto;
 
 import com.flores.taskcodeback.team.entity.TeamMember;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 @Data
@@ -17,9 +18,11 @@ public class TeamMemberRequestDto {
     private Long existingUserId;
 
     /** Requerido solo cuando existingUserId es null (usuario nuevo) */
+    @Size(max = 100, message = "El nombre no puede superar 100 caracteres")
     private String nombre;
 
     @Email(message = "El email no es válido")
+    @Size(max = 150, message = "El email no puede superar 150 caracteres")
     private String email;
 
     private TeamMember.MemberRole role;
@@ -32,5 +35,6 @@ public class TeamMemberRequestDto {
     private String passwordMode;
 
     /** Solo obligatorio cuando passwordMode = "manual" */
+    @Size(max = 128, message = "La contraseña no puede superar 128 caracteres")
     private String password;
 }

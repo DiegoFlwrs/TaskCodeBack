@@ -32,6 +32,9 @@ public class Task {
     @Column(name = "rq_ticket", length = 100)
     private String rqTicket;
 
+    @Column(length = 100)
+    private String solicitante;
+
     @Column(length = 200)
     private String aplicacion;
 

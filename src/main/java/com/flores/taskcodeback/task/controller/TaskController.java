@@ -43,7 +43,7 @@ public class TaskController {
     public ResponseEntity<TaskDto> updateTask(
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody TaskRequestDto request) {
+            @Valid @RequestBody TaskRequestDto request) {
         return ResponseEntity.ok(taskService.updateTask(userDetails.getUsername(), id, request));
     }
 

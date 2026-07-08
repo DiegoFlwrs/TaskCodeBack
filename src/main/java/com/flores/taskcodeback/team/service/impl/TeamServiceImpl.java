@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.team.service.impl;
 
+import com.flores.taskcodeback.config.CacheInvalidationService;
+import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.application.repository.AppRepository;
 import com.flores.taskcodeback.email.service.EmailService;
 import com.flores.taskcodeback.exception.BadRequestException;
@@ -16,6 +18,7 @@ import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -42,10 +45,10 @@ public class TeamServiceImpl implements TeamService {
     private final TaskRepository taskRepository;
     private final TicketRepository ticketRepository;
     private final AppRepository appRepository;
-
-    // ...existing getTeams, createTeam, updateTeam, deleteTeam...
+    private final CacheInvalidationService cacheInvalidationService;
 
     @Override
+    @Cacheable(value = CacheNames.TEAMS, key = "#email")
     @Transactional(readOnly = true)
     public List<TeamDto> getTeams(String email) {
         User user = getUser(email);
@@ -76,7 +79,9 @@ public class TeamServiceImpl implements TeamService {
                 .descripcion(request.getDescripcion())
                 .codigo(code)
                 .build();
-        return toDto(teamRepository.save(team));
+        TeamDto result = toDto(teamRepository.save(team));
+        cacheInvalidationService.evictTeams(email);
+        return result;
     }
 
     @Override
@@ -85,7 +90,9 @@ public class TeamServiceImpl implements TeamService {
         Team team = getTeamForUser(id, user.getId());
         if (request.getNombre() != null) team.setNombre(request.getNombre());
         if (request.getDescripcion() != null) team.setDescripcion(request.getDescripcion());
-        return toDto(teamRepository.save(team));
+        TeamDto result = toDto(teamRepository.save(team));
+        cacheInvalidationService.evictTeams(email);
+        return result;
     }
 
     @Override
@@ -93,6 +100,7 @@ public class TeamServiceImpl implements TeamService {
         User user = getUser(email);
         Team team = getTeamForUser(id, user.getId());
         teamRepository.delete(team);
+        cacheInvalidationService.evictTeams(email);
     }
 
     @Override
@@ -106,6 +114,10 @@ public class TeamServiceImpl implements TeamService {
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Usuario no encontrado con id: " + request.getExistingUserId()));
 
+            if (teamMemberRepository.existsByTeamIdAndUserId(teamId, existingUser.getId())) {
+                throw new BadRequestException("El usuario ya es miembro de este equipo");
+            }
+
             TeamMember member = TeamMember.builder()
                     .team(team)
                     .nombre(existingUser.getNombre())
@@ -115,7 +127,7 @@ public class TeamServiceImpl implements TeamService {
                     .status(request.getStatus() != null ? request.getStatus() : TeamMember.MemberStatus.ACTIVO)
                     .build();
 
-            return toMemberDto(teamMemberRepository.save(member));
+            return invalidateMemberChange(email, toMemberDto(teamMemberRepository.save(member)));
         }
 
         // ── CASO 2: crear usuario nuevo ───────────────────────────────────
@@ -139,6 +151,12 @@ public class TeamServiceImpl implements TeamService {
         } else {
             if (request.getPassword() == null || request.getPassword().isBlank()) {
                 throw new BadRequestException("El campo password es requerido cuando passwordMode es 'manual'");
+            }
+            if (request.getPassword().length() < 6) {
+                throw new BadRequestException("La contraseña debe tener al menos 6 caracteres");
+            }
+            if (request.getPassword().length() > 128) {
+                throw new BadRequestException("La contraseña no puede superar 128 caracteres");
             }
             plainPassword = request.getPassword();
         }
@@ -180,7 +198,13 @@ public class TeamServiceImpl implements TeamService {
             log.warn("No se pudo enviar email de bienvenida a {}: {}", request.getEmail(), ex.getMessage());
         }
 
-        return toMemberDto(saved);
+        return invalidateMemberChange(email, toMemberDto(saved));
+    }
+
+    private TeamMemberDto invalidateMemberChange(String email, TeamMemberDto dto) {
+        cacheInvalidationService.evictTeams(email);
+        cacheInvalidationService.evictAllTeamMembers();
+        return dto;
     }
 
     @Override
@@ -194,8 +218,24 @@ public class TeamServiceImpl implements TeamService {
             throw new AccessDeniedException("El miembro no pertenece a este equipo");
         }
 
+        boolean hasUpdate = request.getNombre() != null || request.getEmail() != null
+                || request.getRole() != null || request.getStatus() != null;
+        if (!hasUpdate) {
+            throw new BadRequestException("Debes enviar al menos un campo para actualizar");
+        }
+
         if (request.getNombre() != null) member.setNombre(request.getNombre());
-        if (request.getEmail() != null) member.setEmail(request.getEmail());
+        if (request.getEmail() != null) {
+            if (request.getEmail().isBlank()) {
+                throw new BadRequestException("El email no puede estar vacío");
+            }
+            userRepository.findByEmail(request.getEmail())
+                    .filter(existing -> member.getUserId() == null || !existing.getId().equals(member.getUserId()))
+                    .ifPresent(existing -> {
+                        throw new BadRequestException("Ya existe una cuenta con el email: " + request.getEmail());
+                    });
+            member.setEmail(request.getEmail());
+        }
         if (request.getRole() != null) member.setRole(request.getRole());
         if (request.getStatus() != null) {
             member.setStatus(request.getStatus());
@@ -211,11 +251,11 @@ public class TeamServiceImpl implements TeamService {
             }
         }
 
-        return toMemberDto(teamMemberRepository.save(member));
+        return invalidateMemberChange(email, toMemberDto(teamMemberRepository.save(member)));
     }
 
     @Override
-    public void deleteMember(String email, UUID teamId, UUID memberId) {
+    public DeleteMemberResultDto deleteMember(String email, UUID teamId, UUID memberId) {
         User user = getUser(email);
         getTeamForUser(teamId, user.getId());
 
@@ -225,29 +265,40 @@ public class TeamServiceImpl implements TeamService {
             throw new AccessDeniedException("El miembro no pertenece a este equipo");
         }
 
-        // Eliminar cuenta de usuario y todo lo asociado a él
-        if (member.getUserId() != null) {
-            Long userId = member.getUserId();
-            log.info("Eliminando cuenta y datos del usuario id={}", userId);
+        Long userId = member.getUserId();
+        teamMemberRepository.delete(member);
+        cacheInvalidationService.evictTeams(email);
+        cacheInvalidationService.evictAllTeamMembers();
 
-            // 1. Eliminar tareas del usuario
-            taskRepository.deleteAll(taskRepository.findByUserIdOrderByFechaDescCreatedAtDesc(userId));
-
-            // 2. Eliminar tickets del usuario
-            ticketRepository.deleteAll(ticketRepository.findByUserIdOrderByCreatedAtDesc(userId));
-
-            // 3. Eliminar aplicaciones del usuario
-            appRepository.deleteAll(appRepository.findByUserIdOrderByNombreAsc(userId));
-
-            // 4. Limpiar referencias createdBy que apunten a este usuario
-            userRepository.clearCreatedBy(userId);
-
-            // 5. Eliminar la cuenta de usuario
-            userRepository.deleteById(userId);
+        if (userId == null) {
+            return DeleteMemberResultDto.builder()
+                    .accountDeleted(false)
+                    .message("Miembro removido del equipo")
+                    .build();
         }
 
-        // Eliminar el miembro del equipo
-        teamMemberRepository.delete(member);
+        List<TeamMember> remainingMemberships = teamMemberRepository.findByUserId(userId);
+        if (!remainingMemberships.isEmpty()) {
+            log.info("Usuario id={} removido del equipo {}. Sigue en {} equipo(s)",
+                    userId, teamId, remainingMemberships.size());
+            return DeleteMemberResultDto.builder()
+                    .accountDeleted(false)
+                    .message("Miembro removido del equipo. Sigue activo en otros equipos.")
+                    .build();
+        }
+
+        log.info("Eliminando cuenta y datos del usuario id={} (sin otros equipos)", userId);
+
+        taskRepository.deleteAll(taskRepository.findByUserIdOrderByFechaDescCreatedAtDesc(userId));
+        ticketRepository.deleteAll(ticketRepository.findByUserIdOrderByCreatedAtDesc(userId));
+        appRepository.deleteAll(appRepository.findByUserIdOrderByNombreAsc(userId));
+        userRepository.clearCreatedBy(userId);
+        userRepository.deleteById(userId);
+
+        return DeleteMemberResultDto.builder()
+                .accountDeleted(true)
+                .message("Miembro y cuenta eliminados permanentemente")
+                .build();
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────
