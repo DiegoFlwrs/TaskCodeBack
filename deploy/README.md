@@ -55,10 +55,34 @@ docker compose -f TaskCodeBack/deploy/docker-compose.yml --env-file .env logs -f
 ## 5. Actualizar después de un `git push`
 
 ```bash
-cd /opt/taskcode/TaskCodeBack && git pull
-cd /opt/taskcode/taskcodefront && git pull
-cd /opt/taskcode
-docker compose -f TaskCodeBack/deploy/docker-compose.yml --env-file .env up -d --build
+/opt/taskcode/TaskCodeBack/deploy/deploy.sh          # rebuild todo
+/opt/taskcode/TaskCodeBack/deploy/deploy.sh backend  # solo backend
+/opt/taskcode/TaskCodeBack/deploy/deploy.sh frontend
+```
+
+## 6. Auto-deploy (GitHub Actions)
+
+Al hacer **push/merge a `main`**, GitHub entra al servidor por SSH y ejecuta `deploy.sh`.
+
+### Secrets en cada repo (Settings → Secrets → Actions)
+
+| Secret | Valor |
+|--------|--------|
+| `SERVER_HOST` | `178.156.222.11` |
+| `SERVER_USER` | `root` |
+| `SSH_PRIVATE_KEY` | Clave privada SSH (`cat ~/.ssh/id_ed25519`) |
+
+### Flujo
+
+1. Trabajas en `develop`
+2. Merge `develop` → `main` en GitHub
+3. Actions despliega automáticamente
+
+### Probar en el servidor
+
+```bash
+chmod +x /opt/taskcode/TaskCodeBack/deploy/deploy.sh
+/opt/taskcode/TaskCodeBack/deploy/deploy.sh
 ```
 
 ## Notas
