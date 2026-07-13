@@ -1,5 +1,6 @@
 package com.flores.taskcodeback.ticket.service;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
 import com.flores.taskcodeback.ticket.dto.TicketDto;
 import com.flores.taskcodeback.ticket.dto.TicketExtensionRequestDto;
 import com.flores.taskcodeback.ticket.dto.TicketExtensionReviewDto;
@@ -10,7 +11,8 @@ import java.util.List;
 import java.util.UUID;
 
 public interface TicketService {
-    List<TicketDto> getTickets(String email, Ticket.TicketStatus status);
+    PageResponse<TicketDto> getTickets(String email, Ticket.TicketStatus status, String search,
+                                       Integer page, Integer size);
     TicketDto createTicket(String email, TicketRequestDto request);
     TicketDto updateTicket(String email, UUID id, TicketRequestDto request);
     void deleteTicket(String email, UUID id);

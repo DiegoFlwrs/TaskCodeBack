@@ -1,13 +1,17 @@
 package com.flores.taskcodeback.task.service.impl;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
+import com.flores.taskcodeback.common.util.PageUtils;
 import com.flores.taskcodeback.config.CacheInvalidationService;
 import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.exception.BadRequestException;
 import com.flores.taskcodeback.exception.ResourceNotFoundException;
+import com.flores.taskcodeback.task.dto.TaskDateSummaryDto;
 import com.flores.taskcodeback.task.dto.TaskDto;
 import com.flores.taskcodeback.task.dto.TaskRequestDto;
 import com.flores.taskcodeback.task.entity.Task;
 import com.flores.taskcodeback.task.repository.TaskRepository;
+import com.flores.taskcodeback.task.repository.TaskSpecifications;
 import com.flores.taskcodeback.task.service.TaskService;
 import com.flores.taskcodeback.ticket.repository.TicketRepository;
 import com.flores.taskcodeback.user.entity.User;
@@ -15,6 +19,9 @@ import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,24 +42,55 @@ public class TaskServiceImpl implements TaskService {
     private final CacheInvalidationService cacheInvalidationService;
 
     @Override
-    @Cacheable(value = CacheNames.TASKS, key = "#email + ':' + @cacheKeyBuilder.taskKey(#fecha, #fechaInicio, #fechaFin)")
+    @Cacheable(value = CacheNames.TASKS, key = "#email + ':' + @cacheKeyBuilder.taskKey(#fecha, #fechaInicio, #fechaFin, #page, #size, #rqTicket, #aplicacion, #search)")
     @Transactional(readOnly = true)
-    public List<TaskDto> getTasks(String email, LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin) {
+    public PageResponse<TaskDto> getTasks(String email, LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin,
+                                          String rqTicket, String aplicacion, String search,
+                                          Integer page, Integer size) {
         User user = getUser(email);
-        List<Task> tasks;
 
-        if (fecha != null) {
-            tasks = taskRepository.findByUserIdAndFechaOrderByCreatedAtDesc(user.getId(), fecha);
-        } else if (fechaInicio != null && fechaFin != null) {
-            if (fechaInicio.isAfter(fechaFin)) {
-                throw new BadRequestException("fechaInicio no puede ser posterior a fechaFin");
-            }
-            tasks = taskRepository.findByUserIdAndFechaBetween(user.getId(), fechaInicio, fechaFin);
-        } else {
-            tasks = taskRepository.findByUserIdOrderByFechaDescCreatedAtDesc(user.getId());
+        if (fechaInicio != null && fechaFin != null && fechaInicio.isAfter(fechaFin)) {
+            throw new BadRequestException("fechaInicio no puede ser posterior a fechaFin");
         }
 
-        return tasks.stream().map(this::toDto).collect(Collectors.toList());
+        String normalizedSearch = normalizeSearch(search);
+        String normalizedRq = normalizeFilter(rqTicket);
+        String normalizedApp = normalizeFilter(aplicacion);
+
+        Specification<Task> spec = TaskSpecifications.forUser(user.getId());
+        if (fecha != null) {
+            spec = spec.and(TaskSpecifications.withFecha(fecha));
+        }
+        if (fechaInicio != null) {
+            spec = spec.and(TaskSpecifications.withFechaFrom(fechaInicio));
+        }
+        if (fechaFin != null) {
+            spec = spec.and(TaskSpecifications.withFechaTo(fechaFin));
+        }
+        if (normalizedRq != null) {
+            spec = spec.and(TaskSpecifications.withRqTicket(normalizedRq));
+        }
+        if (normalizedApp != null) {
+            spec = spec.and(TaskSpecifications.withAplicacion(normalizedApp));
+        }
+        if (normalizedSearch != null) {
+            spec = spec.and(TaskSpecifications.withSearch(normalizedSearch));
+        }
+
+        Page<Task> taskPage = taskRepository.findAll(
+                spec,
+                PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "fecha", "createdAt"))
+        );
+
+        return PageResponse.from(taskPage.map(this::toDto));
+    }
+
+    @Override
+    @Cacheable(value = CacheNames.TASKS, key = "#email + ':date-summaries'")
+    @Transactional(readOnly = true)
+    public List<TaskDateSummaryDto> getTaskDateSummaries(String email) {
+        User user = getUser(email);
+        return taskRepository.findDateSummariesByUserId(user.getId(), Task.TaskStatus.COMPLETADA);
     }
 
     @Override
@@ -145,6 +183,20 @@ public class TaskServiceImpl implements TaskService {
     private String resolveSolicitante(String solicitante, String rqTicket) {
         if (solicitante != null && !solicitante.isBlank()) return solicitante;
         return inferSolicitante(rqTicket);
+    }
+
+    private String normalizeSearch(String search) {
+        if (search == null || search.isBlank()) {
+            return null;
+        }
+        return search.trim();
+    }
+
+    private String normalizeFilter(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private User getUser(String email) {

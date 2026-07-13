@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.task.controller;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
+import com.flores.taskcodeback.task.dto.TaskDateSummaryDto;
 import com.flores.taskcodeback.task.dto.TaskDto;
 import com.flores.taskcodeback.task.dto.TaskRequestDto;
 import com.flores.taskcodeback.task.service.TaskService;
@@ -24,12 +26,25 @@ public class TaskController {
     private final TaskService taskService;
 
     @GetMapping
-    public ResponseEntity<List<TaskDto>> getTasks(
+    public ResponseEntity<PageResponse<TaskDto>> getTasks(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaInicio,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin) {
-        return ResponseEntity.ok(taskService.getTasks(userDetails.getUsername(), fecha, fechaInicio, fechaFin));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fechaFin,
+            @RequestParam(required = false) String rqTicket,
+            @RequestParam(required = false) String aplicacion,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ResponseEntity.ok(taskService.getTasks(
+                userDetails.getUsername(), fecha, fechaInicio, fechaFin,
+                rqTicket, aplicacion, search, page, size));
+    }
+
+    @GetMapping("/dates")
+    public ResponseEntity<List<TaskDateSummaryDto>> getTaskDateSummaries(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        return ResponseEntity.ok(taskService.getTaskDateSummaries(userDetails.getUsername()));
     }
 
     @PostMapping

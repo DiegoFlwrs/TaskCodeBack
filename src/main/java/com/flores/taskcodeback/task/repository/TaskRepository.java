@@ -1,7 +1,9 @@
 package com.flores.taskcodeback.task.repository;
 
+import com.flores.taskcodeback.task.dto.TaskDateSummaryDto;
 import com.flores.taskcodeback.task.entity.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -11,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface TaskRepository extends JpaRepository<Task, UUID> {
+public interface TaskRepository extends JpaRepository<Task, UUID>, JpaSpecificationExecutor<Task> {
 
     List<Task> findByUserIdOrderByFechaDescCreatedAtDesc(Long userId);
 
@@ -33,4 +35,16 @@ public interface TaskRepository extends JpaRepository<Task, UUID> {
                                                       @Param("teamId") UUID teamId,
                                                       @Param("start") LocalDate start,
                                                       @Param("end") LocalDate end);
+
+    @Query("""
+            SELECT new com.flores.taskcodeback.task.dto.TaskDateSummaryDto(
+                t.fecha,
+                COUNT(t),
+                SUM(CASE WHEN t.status = :completedStatus THEN 1 ELSE 0 END)
+            )
+            FROM Task t WHERE t.user.id = :userId
+            GROUP BY t.fecha ORDER BY t.fecha DESC
+            """)
+    List<TaskDateSummaryDto> findDateSummariesByUserId(@Param("userId") Long userId,
+                                                       @Param("completedStatus") Task.TaskStatus completedStatus);
 }

@@ -18,12 +18,14 @@ public class TaskRequestDto {
     @Size(max = 255, message = "El nombre no puede superar 255 caracteres")
     private String nombre;
 
+    @NotBlank(message = "El RQ/Ticket es requerido")
     @Size(max = 50, message = "RQ/Ticket no puede superar 50 caracteres")
     private String rqTicket;
 
     @Size(max = 100, message = "Solicitante no puede superar 100 caracteres")
     private String solicitante;
 
+    @NotBlank(message = "La aplicación es requerida")
     @Size(max = 150, message = "Aplicación no puede superar 150 caracteres")
     private String aplicacion;
 

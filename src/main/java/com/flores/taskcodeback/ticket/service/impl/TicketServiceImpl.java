@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.ticket.service.impl;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
+import com.flores.taskcodeback.common.util.PageUtils;
 import com.flores.taskcodeback.config.CacheInvalidationService;
 import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.exception.BadRequestException;
@@ -17,6 +19,8 @@ import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,37 +42,46 @@ public class TicketServiceImpl implements TicketService {
     private final CacheInvalidationService cacheInvalidationService;
 
     @Override
-    @Cacheable(value = CacheNames.TICKETS, key = "#email + ':' + @cacheKeyBuilder.ticketKey(#status != null ? #status.name() : null)")
+    @Cacheable(value = CacheNames.TICKETS, key = "#email + ':' + @cacheKeyBuilder.ticketKey(#status != null ? #status.name() : null, #page, #size, #search)")
     @Transactional(readOnly = true)
-    public List<TicketDto> getTickets(String email, Ticket.TicketStatus status) {
+    public PageResponse<TicketDto> getTickets(String email, Ticket.TicketStatus status, String search,
+                                              Integer page, Integer size) {
         User user = getUser(email);
-
-        List<Ticket> owned = status != null
-                ? ticketRepository.findByUserIdAndStatusOrderByCreatedAtDesc(user.getId(), status)
-                : ticketRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+        String normalizedSearch = search != null && !search.isBlank() ? search.trim() : null;
 
         List<UUID> memberIds = teamMemberRepository.findByUserId(user.getId()).stream()
                 .map(TeamMember::getId)
                 .collect(Collectors.toList());
 
-        List<Ticket> assigned = memberIds.isEmpty()
-                ? Collections.emptyList()
-                : (status != null
-                    ? ticketRepository.findByAssignedMemberIdInAndStatus(memberIds, status)
-                    : ticketRepository.findByAssignedMemberIdIn(memberIds));
+        Page<Ticket> ticketPage = memberIds.isEmpty()
+                ? ticketRepository.findAccessibleByUserOnly(
+                        user.getId(), status, normalizedSearch,
+                        PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")))
+                : ticketRepository.findAccessibleByUserOrMembers(
+                        user.getId(), memberIds, status, normalizedSearch,
+                        PageUtils.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
 
-        LinkedHashSet<UUID> ticketIds = new LinkedHashSet<>();
-        owned.forEach(t -> ticketIds.add(t.getId()));
-        assigned.forEach(t -> ticketIds.add(t.getId()));
-
-        if (ticketIds.isEmpty()) {
-            return Collections.emptyList();
+        if (ticketPage.isEmpty()) {
+            return PageResponse.from(ticketPage.map(t -> toDto(t, user)));
         }
 
-        List<Ticket> tickets = ticketRepository.findAllByIdInWithAssignments(new ArrayList<>(ticketIds));
-        tickets.sort(Comparator.comparing(Ticket::getCreatedAt).reversed());
+        List<UUID> ids = ticketPage.getContent().stream().map(Ticket::getId).collect(Collectors.toList());
+        Map<UUID, Ticket> withAssignments = ticketRepository.findAllByIdInWithAssignments(ids).stream()
+                .collect(Collectors.toMap(Ticket::getId, t -> t, (a, b) -> a, LinkedHashMap::new));
 
-        return tickets.stream().map(t -> toDto(t, user)).collect(Collectors.toList());
+        List<TicketDto> content = ids.stream()
+                .map(withAssignments::get)
+                .filter(Objects::nonNull)
+                .map(t -> toDto(t, user))
+                .collect(Collectors.toList());
+
+        return PageResponse.<TicketDto>builder()
+                .content(content)
+                .page(ticketPage.getNumber())
+                .size(ticketPage.getSize())
+                .totalElements(ticketPage.getTotalElements())
+                .totalPages(ticketPage.getTotalPages())
+                .build();
     }
 
     @Override
