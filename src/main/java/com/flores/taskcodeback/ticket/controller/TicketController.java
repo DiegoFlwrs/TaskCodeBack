@@ -1,5 +1,6 @@
 package com.flores.taskcodeback.ticket.controller;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
 import com.flores.taskcodeback.ticket.dto.TicketDto;
 import com.flores.taskcodeback.ticket.dto.TicketExtensionRequestDto;
 import com.flores.taskcodeback.ticket.dto.TicketExtensionReviewDto;
@@ -25,10 +26,14 @@ public class TicketController {
     private final TicketService ticketService;
 
     @GetMapping
-    public ResponseEntity<List<TicketDto>> getTickets(
+    public ResponseEntity<PageResponse<TicketDto>> getTickets(
             @AuthenticationPrincipal UserDetails userDetails,
-            @RequestParam(required = false) Ticket.TicketStatus status) {
-        return ResponseEntity.ok(ticketService.getTickets(userDetails.getUsername(), status));
+            @RequestParam(required = false) Ticket.TicketStatus status,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ResponseEntity.ok(ticketService.getTickets(
+                userDetails.getUsername(), status, search, page, size));
     }
 
     @PostMapping

@@ -1,6 +1,8 @@
 package com.flores.taskcodeback.ticket.repository;
 
 import com.flores.taskcodeback.ticket.entity.Ticket;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -50,4 +52,33 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
     boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCase(Long userId, String codigo);
 
     boolean existsByUserIdAndTeamIdIsNullAndCodigoIgnoreCaseAndIdNot(Long userId, String codigo, UUID id);
+
+    @Query("""
+            SELECT DISTINCT t FROM Ticket t LEFT JOIN t.assignedMembers am
+            WHERE t.user.id = :userId
+            AND (:status IS NULL OR t.status = :status)
+            AND (:search IS NULL OR :search = '' OR
+                 LOWER(t.nombre) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(t.codigo) LIKE LOWER(CONCAT('%', :search, '%')))
+            ORDER BY t.createdAt DESC
+            """)
+    Page<Ticket> findAccessibleByUserOnly(@Param("userId") Long userId,
+                                          @Param("status") Ticket.TicketStatus status,
+                                          @Param("search") String search,
+                                          Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT t FROM Ticket t LEFT JOIN t.assignedMembers am
+            WHERE (t.user.id = :userId OR am.id IN :memberIds)
+            AND (:status IS NULL OR t.status = :status)
+            AND (:search IS NULL OR :search = '' OR
+                 LOWER(t.nombre) LIKE LOWER(CONCAT('%', :search, '%')) OR
+                 LOWER(t.codigo) LIKE LOWER(CONCAT('%', :search, '%')))
+            ORDER BY t.createdAt DESC
+            """)
+    Page<Ticket> findAccessibleByUserOrMembers(@Param("userId") Long userId,
+                                               @Param("memberIds") List<UUID> memberIds,
+                                               @Param("status") Ticket.TicketStatus status,
+                                               @Param("search") String search,
+                                               Pageable pageable);
 }

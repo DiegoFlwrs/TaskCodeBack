@@ -1,5 +1,7 @@
 package com.flores.taskcodeback.application.service.impl;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
+import com.flores.taskcodeback.common.util.PageUtils;
 import com.flores.taskcodeback.config.CacheInvalidationService;
 import com.flores.taskcodeback.config.CacheNames;
 import com.flores.taskcodeback.application.dto.AppDto;
@@ -13,6 +15,7 @@ import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,12 +35,18 @@ public class AppServiceImpl implements AppService {
     private final CacheInvalidationService cacheInvalidationService;
 
     @Override
-    @Cacheable(value = CacheNames.APPS, key = "#email")
+    @Cacheable(value = CacheNames.APPS, key = "#email + ':' + @cacheKeyBuilder.appKey(#page, #size, #search)")
     @Transactional(readOnly = true)
-    public List<AppDto> getApps(String email) {
+    public PageResponse<AppDto> getApps(String email, String search, Integer page, Integer size) {
         User user = getUser(email);
-        return appRepository.findByUserIdOrderByNombreAsc(user.getId())
-                .stream().map(this::toDto).collect(Collectors.toList());
+        String normalizedSearch = search != null && !search.isBlank() ? search.trim() : null;
+        return PageResponse.from(
+                appRepository.findByUserIdFiltered(
+                        user.getId(),
+                        normalizedSearch,
+                        PageUtils.of(page, size, Sort.by(Sort.Direction.ASC, "nombre"))
+                ).map(this::toDto)
+        );
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.flores.taskcodeback.application.controller;
 
+import com.flores.taskcodeback.common.dto.PageResponse;
 import com.flores.taskcodeback.application.dto.AppDto;
 import com.flores.taskcodeback.application.dto.AppRequestDto;
 import com.flores.taskcodeback.application.service.AppService;
@@ -22,8 +23,12 @@ public class AppController {
     private final AppService appService;
 
     @GetMapping
-    public ResponseEntity<List<AppDto>> getApps(@AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(appService.getApps(userDetails.getUsername()));
+    public ResponseEntity<PageResponse<AppDto>> getApps(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ResponseEntity.ok(appService.getApps(userDetails.getUsername(), search, page, size));
     }
 
     @PostMapping
