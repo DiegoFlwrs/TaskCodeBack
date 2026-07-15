@@ -15,6 +15,7 @@ public class TeamDto {
     private String nombre;
     private String descripcion;
     private String codigo;
+    private Long ownerId;
     private List<TeamMemberDto> members;
     private LocalDateTime createdAt;
 }

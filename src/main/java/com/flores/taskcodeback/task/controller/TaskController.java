@@ -35,10 +35,12 @@ public class TaskController {
             @RequestParam(required = false) String aplicacion,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) UUID teamId) {
         return ResponseEntity.ok(taskService.getTasks(
                 userDetails.getUsername(), fecha, fechaInicio, fechaFin,
-                rqTicket, aplicacion, search, page, size));
+                rqTicket, aplicacion, search, page, size, userId, teamId));
     }
 
     @GetMapping("/dates")

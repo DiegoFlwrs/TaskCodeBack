@@ -14,6 +14,10 @@ import com.flores.taskcodeback.task.repository.TaskRepository;
 import com.flores.taskcodeback.task.repository.TaskSpecifications;
 import com.flores.taskcodeback.task.service.TaskService;
 import com.flores.taskcodeback.ticket.repository.TicketRepository;
+import com.flores.taskcodeback.team.entity.Team;
+import com.flores.taskcodeback.team.entity.TeamMember;
+import com.flores.taskcodeback.team.repository.TeamMemberRepository;
+import com.flores.taskcodeback.team.repository.TeamRepository;
 import com.flores.taskcodeback.user.entity.User;
 import com.flores.taskcodeback.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +26,7 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,25 +44,36 @@ public class TaskServiceImpl implements TaskService {
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
     private final TicketRepository ticketRepository;
+    private final TeamRepository teamRepository;
+    private final TeamMemberRepository teamMemberRepository;
     private final CacheInvalidationService cacheInvalidationService;
 
     @Override
-    @Cacheable(value = CacheNames.TASKS, key = "#email + ':' + @cacheKeyBuilder.taskKey(#fecha, #fechaInicio, #fechaFin, #page, #size, #rqTicket, #aplicacion, #search)")
+    @Cacheable(value = CacheNames.TASKS, key = "#email + ':' + @cacheKeyBuilder.taskKey(#fecha, #fechaInicio, #fechaFin, #page, #size, #rqTicket, #aplicacion, #search, #userId, #teamId)")
     @Transactional(readOnly = true)
     public PageResponse<TaskDto> getTasks(String email, LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin,
                                           String rqTicket, String aplicacion, String search,
-                                          Integer page, Integer size) {
+                                          Integer page, Integer size, Long userId, UUID teamId) {
         User user = getUser(email);
 
         if (fechaInicio != null && fechaFin != null && fechaInicio.isAfter(fechaFin)) {
             throw new BadRequestException("fechaInicio no puede ser posterior a fechaFin");
         }
 
+        Long targetUserId = user.getId();
+        if (userId != null) {
+            if (teamId == null) {
+                throw new BadRequestException("teamId es obligatorio cuando se consultan tareas de un miembro");
+            }
+            assertTeamOwnerCanAccessMember(email, teamId, userId);
+            targetUserId = userId;
+        }
+
         String normalizedSearch = normalizeSearch(search);
         String normalizedRq = normalizeFilter(rqTicket);
         String normalizedApp = normalizeFilter(aplicacion);
 
-        Specification<Task> spec = TaskSpecifications.forUser(user.getId());
+        Specification<Task> spec = TaskSpecifications.forUser(targetUserId);
         if (fecha != null) {
             spec = spec.and(TaskSpecifications.withFecha(fecha));
         }
@@ -202,6 +218,23 @@ public class TaskServiceImpl implements TaskService {
     private User getUser(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuario no encontrado"));
+    }
+
+    private void assertTeamOwnerCanAccessMember(String callerEmail, UUID teamId, Long memberUserId) {
+        Team team = teamRepository.findById(teamId)
+                .orElseThrow(() -> new ResourceNotFoundException("Equipo no encontrado"));
+
+        if (!team.getOwner().getEmail().equalsIgnoreCase(callerEmail)) {
+            throw new AccessDeniedException("Solo el líder del equipo puede consultar reportes de sus miembros");
+        }
+
+        boolean isActiveMember = teamMemberRepository.findByTeamId(teamId).stream()
+                .anyMatch(m -> memberUserId.equals(m.getUserId())
+                        && m.getStatus() == TeamMember.MemberStatus.ACTIVO);
+
+        if (!isActiveMember) {
+            throw new AccessDeniedException("El usuario no es un miembro activo de este equipo");
+        }
     }
 
     private Task getTaskForUser(UUID id, Long userId) {

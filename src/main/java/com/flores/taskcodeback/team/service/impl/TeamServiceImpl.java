@@ -356,6 +356,7 @@ public class TeamServiceImpl implements TeamService {
                 .nombre(team.getNombre())
                 .descripcion(team.getDescripcion())
                 .codigo(team.getCodigo())
+                .ownerId(team.getOwner() != null ? team.getOwner().getId() : null)
                 .members(members)
                 .createdAt(team.getCreatedAt())
                 .build();
