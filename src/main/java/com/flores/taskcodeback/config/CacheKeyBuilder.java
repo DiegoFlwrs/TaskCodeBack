@@ -9,7 +9,8 @@ import java.util.UUID;
 public class CacheKeyBuilder {
 
     public String taskKey(LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin,
-                          Integer page, Integer size, String rqTicket, String aplicacion, String search) {
+                          Integer page, Integer size, String rqTicket, String aplicacion, String search,
+                          Long userId, UUID teamId) {
         StringBuilder key = new StringBuilder("p:");
         key.append(page != null ? page : 0).append(':').append(size != null ? size : 5).append(':');
         if (fecha != null) {
@@ -22,6 +23,8 @@ public class CacheKeyBuilder {
         key.append(':').append(rqTicket != null ? rqTicket : "");
         key.append(':').append(aplicacion != null ? aplicacion : "");
         key.append(':').append(search != null ? search : "");
+        key.append(':').append(userId != null ? userId : "self");
+        key.append(':').append(teamId != null ? teamId : "");
         return key.toString();
     }
 

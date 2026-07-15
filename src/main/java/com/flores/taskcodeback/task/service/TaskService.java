@@ -11,7 +11,8 @@ import java.util.UUID;
 
 public interface TaskService {
     PageResponse<TaskDto> getTasks(String email, LocalDate fecha, LocalDate fechaInicio, LocalDate fechaFin,
-                                   String rqTicket, String aplicacion, String search, Integer page, Integer size);
+                                   String rqTicket, String aplicacion, String search, Integer page, Integer size,
+                                   Long userId, UUID teamId);
     List<TaskDateSummaryDto> getTaskDateSummaries(String email);
     TaskDto createTask(String email, TaskRequestDto request);
     TaskDto updateTask(String email, UUID id, TaskRequestDto request);
